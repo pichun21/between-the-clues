@@ -2031,6 +2031,7 @@ message=function(t){let out=t;for(const [re,f] of R){const m=String(t).match(re)
 
 // ---- 開案過場 ----
 let shownLevel=null;
+addEventListener('pointerdown',()=>{window.btcUnlocked=true;},{capture:true,once:true});
 function openingFx(){if(document.querySelector('.tour-wrap:not([hidden])'))return;
  const n=level+1,title=titles[level],story=stories[level];
  const w=document.createElement('div');w.className='case-intro';
@@ -2038,8 +2039,10 @@ function openingFx(){if(document.querySelector('.tour-wrap:not([hidden])'))retur
  document.body.append(w);const p=w.querySelector('.ci-story');let k=0,timer;
  const done=()=>{clearInterval(timer);p.textContent=story;w.classList.add('typed');};
  const close=()=>{w.classList.add('out');setTimeout(()=>w.remove(),350);};
- timer=setInterval(()=>{k++;p.textContent=story.slice(0,k);if(k>=story.length)done();},38);
- w.onclick=()=>{w.classList.contains('typed')?close():done();};
+ const start=()=>{w.classList.remove('waiting');timer=setInterval(()=>{k++;p.textContent=story.slice(0,k);if(audioOn&&k%2&&window.btcSfx)btcSfx.type();if(k>=story.length)done();},38);};
+ if(window.btcUnlocked){start();w.onclick=()=>{w.classList.contains('typed')?close():done();};}
+ else{w.classList.add('waiting');p.innerHTML='<span class="ci-tap">▶ 點一下，開始調查</span>';
+  w.onclick=()=>{if(w.classList.contains('waiting')){window.btcUnlocked=true;if(window.btcSfx)btcSfx.type();p.textContent='';start();return;}w.classList.contains('typed')?close():done();};}
 }
 const prevRender=render;
 render=function(){prevRender();if(shownLevel!==level){const first=shownLevel===null;shownLevel=level;setTimeout(openingFx,first?650:120);}};
@@ -2475,6 +2478,9 @@ const sfx={
  chime(){[0,.9,1.8].forEach(at=>{[880,1320,1760,2640].forEach((f,k)=>tone({f,dur:1.6,vol:.07/(k+1),at}));});}
 };
 window.btcSfx=sfx;
+sfx.tab=()=>{burst({f:1500,q:1.2,dur:.05,vol:.14});tone({f:620,dur:.07,vol:.05,type:'triangle',at:.01});};
+sfx.drawer=()=>{const c=AC();if(!c)return;const t=c.currentTime,src=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();src.buffer=noiseBuf(c,.35);f.type='bandpass';f.Q.value=2;f.frequency.setValueAtTime(350,t);f.frequency.linearRampToValueAtTime(650,t+.25);g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.16,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+.28);src.connect(f).connect(g).connect(c.destination);src.start(t);src.stop(t+.35);tone({f:110,dur:.12,vol:.2,slide:.6,at:.27});burst({f:600,q:2,dur:.05,vol:.2,at:.27});};
+document.addEventListener('pointerdown',e=>{if(!audioOn)return;if(e.target.closest('.workspace-tab'))sfx.tab();else if(e.target.closest('#cases .case'))sfx.drawer();},true);
 const baseTone=playTone;
 playTone=function(f){if(!audioOn)return;({440:sfx.place,300:sfx.stamp,330:sfx.soft,410:sfx.paper,240:sfx.error}[f]||(()=>baseTone(f)))();};
 // 結案鐘聲
@@ -2484,14 +2490,26 @@ if(st)new MutationObserver(()=>{if(audioOn&&/結案|指認成功/.test(st.textCo
 /* 環境音：雨聲＋壁爐＋鐘擺 */
 let amb=null;
 function ambStart(){const c=AC();if(!c||amb)return;const master=c.createGain();master.gain.value=0;master.connect(c.destination);master.gain.linearRampToValueAtTime(1,c.currentTime+1.5);
- const rain=c.createBufferSource();rain.buffer=noiseBuf(c,4);rain.loop=true;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1400;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=350;const rg=c.createGain();rg.gain.value=.05;rain.connect(hp).connect(lp).connect(rg).connect(master);rain.start();
- const pops=setInterval(()=>{if(Math.random()<.55){const t=c.currentTime,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,.05);f.type='bandpass';f.frequency.value=900+Math.random()*1800;g.gain.setValueAtTime(.05+Math.random()*.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);s.connect(f).connect(g).connect(master);s.start(t);}},170);
- let tick=0;const clock=setInterval(()=>{const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=tick++%2?1800:1500;g.gain.setValueAtTime(.012,t);g.gain.exponentialRampToValueAtTime(.0001,t+.03);const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=2000;o.connect(f).connect(g).connect(master);o.start(t);o.stop(t+.04);},1000);
- amb={master,rain,pops,clock};}
-function ambStop(){if(!amb)return;const c=AC(),a=amb;amb=null;a.master.gain.linearRampToValueAtTime(0,c.currentTime+.8);clearInterval(a.pops);clearInterval(a.clock);setTimeout(()=>{try{a.rain.stop();a.master.disconnect();}catch{}},900);}
+ // 火焰底噪：棕噪音＋低通，音量緩慢起伏
+ const len=c.sampleRate*4,buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);let last=0;for(let i=0;i<len;i++){last=(last+.02*(Math.random()*2-1))/1.02;d[i]=last*3.5;}
+ const roar=c.createBufferSource();roar.buffer=buf;roar.loop=true;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=180;const rg=c.createGain();rg.gain.value=.045;
+ const lfo=c.createOscillator(),lg=c.createGain();lfo.frequency.value=.2;lg.gain.value=.012;lfo.connect(lg).connect(rg.gain);lfo.start();
+ roar.connect(lp).connect(rg).connect(master);roar.start();
+ // 木柴劈啪
+ const crack=()=>{const t=c.currentTime,n=1+Math.floor(Math.random()*3);for(let k=0;k<n;k++){const at=t+k*(.02+Math.random()*.05),s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,.04);f.type='bandpass';f.frequency.value=1200+Math.random()*3500;f.Q.value=1.5;const v=.04+Math.random()*.12;g.gain.setValueAtTime(v,at);g.gain.exponentialRampToValueAtTime(.001,at+.015+Math.random()*.03);s.connect(f).connect(g).connect(master);s.start(at);}};
+ const pops=setInterval(()=>{if(Math.random()<.45)crack();},140);
+ // 偶爾一聲較大的爆裂
+ const big=setInterval(()=>{if(Math.random()<.3){const t=c.currentTime,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,.12);f.type='lowpass';f.frequency.value=2500;g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+.09);s.connect(f).connect(g).connect(master);s.start(t);}},2200);
+ amb={master,rain:roar,pops,clock:big,lfo};}
+function ambStop(){if(!amb)return;const c=AC(),a=amb;amb=null;a.master.gain.linearRampToValueAtTime(0,c.currentTime+.8);clearInterval(a.pops);clearInterval(a.clock);setTimeout(()=>{try{a.rain.stop();a.lfo.stop();a.master.disconnect();}catch{}},900);}
 const ab=document.createElement('button');ab.type='button';ab.className='amb-toggle';ab.setAttribute('aria-pressed','false');
-const drawAb=()=>{ab.innerHTML=`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 15a4 4 0 1 1 1.2-7.8A5.5 5.5 0 0 1 18.5 9 3.5 3.5 0 0 1 18 16H8"/>${amb?'<path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>':'<path d="M4 4l16 16"/>'}</svg><span>${amb?'雨夜環境音：開':'雨夜環境音'}</span>`;ab.setAttribute('aria-pressed',String(!!amb));};
-ab.onclick=()=>{amb?ambStop():ambStart();drawAb();};drawAb();document.body.append(ab);
+const drawAb=()=>{ab.innerHTML=`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-7.5z"/><path d="M5 20l14-3M5 17l14 3"/>${amb?'':'<path d="M3 3l18 18"/>'}</svg><span>${amb?'篝火環境音：開':'篝火環境音'}</span>`;ab.setAttribute('aria-pressed',String(!!amb));};
+let wantAmb=true;try{wantAmb=localStorage.getItem('btc-amb')!=='0'}catch{}
+const saveAmb=v=>{wantAmb=v;try{localStorage.setItem('btc-amb',v?'1':'0')}catch{}};
+const drawAb2=()=>{drawAb();if(!amb&&wantAmb){ab.querySelector('span').textContent='篝火環境音：開';ab.setAttribute('aria-pressed','true');}};
+ab.onclick=()=>{if(amb){ambStop();saveAmb(false);}else if(wantAmb&&!amb&&!window.__ambTried){saveAmb(false);}else{ambStart();saveAmb(true);}window.__ambTried=true;drawAb2();};
+addEventListener('pointerdown',e=>{if(window.__ambTried)return;if(e.target.closest('.amb-toggle'))return;window.__ambTried=true;if(wantAmb&&!amb){ambStart();drawAb2();}},{capture:true});
+drawAb2();{const pg=document.getElementById('progress');if(pg){const w=document.createElement('div');w.className='top-right';pg.before(w);w.append(pg,ab);}else document.body.append(ab);}
 
 /* ================= 2. 詢問演出 ================= */
 const tr=document.getElementById('interviewTranscript');
@@ -2507,7 +2525,7 @@ if(tr){
   let liar=false;try{liar=idx===unreliableWitness(level);}catch{}
   tr.classList.add('talking');tr.classList.toggle('nervous',liar);
   typeInto(bq,bq.textContent,{liar}).then(()=>tr.classList.remove('talking'));
-  const ans=tr.querySelector('.followup-answer:not([data-typed])');if(ans)ans.dataset.typed='1';
+  const ans=tr.querySelector('.followup-answer:not([data-typed])');if(ans&&ans.textContent.trim())ans.dataset.typed='1';
  }).observe(tr,{childList:true,subtree:true});
  new MutationObserver(()=>{const ans=tr.querySelector('.followup-answer:not([data-typed])');if(ans&&ans.textContent.trim()){ans.dataset.typed='1';typeInto(ans,ans.textContent);}}).observe(tr,{childList:true,subtree:true,characterData:true});
  tr.addEventListener('click',e=>{if(typing&&!e.target.closest('button'))typing.finish();});
@@ -2527,11 +2545,36 @@ const FR=[
  ['錶鍊','十月十六日','如果你收集到這裡，代表你已經看穿了九個謊言。最後一片，就在你一直以為最不可能的地方。']];
 const FINAL_TRUTH='十片零件拼回原樣，懷錶的指針停在 22:43。轉動錶冠三圈半，背蓋彈開——裡面是一張摺得極小的紙條：<br><br>「書房，第三排書架，左數第二十二本，第四十三頁。」<br><br>那一頁夾著老莊主真正的遺囑，以及一句話：<br><em>「真相從不藏在誰在哪裡，而在於你是否願意看清每一句話。」</em><br><br>十宗案件，終於結案。';
 function solved(){return (save.completed||[]).length;}
+function watchSVG(done,n){const full=n===10;let seg='';for(let k=0;k<10;k++){const a0=(k/10)*360-90+2,a1=((k+1)/10)*360-90-2,r=1,R1=37,R2=44;const P=(r,a)=>[100+r*Math.cos(a*Math.PI/180),112+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2)).join(',');seg+=`<path d="M${P(R2,a0)} A${R2},${R2} 0 0 1 ${P(R2,a1)} L${P(R1,a1)} A${R1},${R1} 0 0 0 ${P(R1,a0)}Z" fill="${done.has(k)?'url(#wgold)':'#2a1d14'}" stroke="${done.has(k)?'#fff3c4':'#5a4632'}" stroke-width=".6" ${done.has(k)?'filter="url(#wglow)"':''}/>`;}
+ let ticks='';for(let k=0;k<60;k++){const a=k*6*Math.PI/180,big=k%5===0,r1=big?28:31,r2=33;ticks+=`<line x1="${(100+r1*Math.sin(a)).toFixed(2)}" y1="${(112-r1*Math.cos(a)).toFixed(2)}" x2="${(100+r2*Math.sin(a)).toFixed(2)}" y2="${(112-r2*Math.cos(a)).toFixed(2)}" stroke="#3d2817" stroke-width="${big?1.6:.5}"/>`;}
+ const ROM=['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];let rom='';ROM.forEach((t,k)=>{const a=k*30*Math.PI/180;rom+=`<text x="${(100+22*Math.sin(a)).toFixed(2)}" y="${(112-22*Math.cos(a)+1.9).toFixed(2)}" font-size="4.8" text-anchor="middle" font-family="Georgia,serif" fill="#3d2817">${t}</text>`;});
+ const hr=full?'rotate(-49 100 112)':'rotate(-30 100 112)',mn=full?'rotate(258 100 112)':'rotate(90 100 112)';
+ return `<svg viewBox="0 0 200 200" aria-hidden="true"><defs>
+ <radialGradient id="wcase" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#fff0c2"/><stop offset=".35" stop-color="#d9b25e"/><stop offset=".75" stop-color="#8f6a2a"/><stop offset="1" stop-color="#5e4318"/></radialGradient>
+ <linearGradient id="wgold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".5" stop-color="#e2b453"/><stop offset="1" stop-color="#a87a2b"/></linearGradient>
+ <radialGradient id="wdial" cx="45%" cy="40%" r="70%"><stop offset="0" stop-color="#fffaf0"/><stop offset=".8" stop-color="#f0e2c2"/><stop offset="1" stop-color="#d9c49a"/></radialGradient>
+ <radialGradient id="wglass" cx="35%" cy="25%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient>
+ <filter id="wglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="wsh"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity=".6"/></filter></defs>
+ <g filter="url(#wsh)">
+ <path d="M88 52 Q100 30 112 52" fill="none" stroke="url(#wcase)" stroke-width="5" stroke-linecap="round"/>
+ <rect x="93" y="54" width="14" height="10" rx="2" fill="url(#wcase)"/><rect x="95" y="51" width="10" height="4" rx="1.5" fill="#c99a44"/>
+ ${[...Array(7)].map((_,k)=>`<line x1="${94.5+k*1.8}" y1="55" x2="${94.5+k*1.8}" y2="63" stroke="#7a5a22" stroke-width=".5"/>`).join('')}
+ <circle cx="100" cy="112" r="49" fill="url(#wcase)"/><circle cx="100" cy="112" r="46" fill="none" stroke="#fff3c8" stroke-opacity=".5" stroke-width=".8"/>
+ <circle cx="100" cy="112" r="45" fill="#1a110b"/>${seg}
+ <circle cx="100" cy="112" r="35.5" fill="url(#wdial)" stroke="#8f6a2a" stroke-width="1.2"/>
+ <circle cx="100" cy="112" r="26" fill="none" stroke="#3d281733" stroke-width=".5"/>${ticks}${rom}
+ <circle cx="100" cy="125" r="6.5" fill="none" stroke="#3d281766" stroke-width=".5"/><line x1="100" y1="125" x2="100" y2="120" stroke="#a4423b" stroke-width=".7"/>
+ 
+ <g transform="${hr}"><path d="M100 115 L98.2 112 L100 94 L101.8 112Z" fill="#2b1d14"/><circle cx="100" cy="97" r="1.8" fill="none" stroke="#2b1d14" stroke-width="1"/></g>
+ <g transform="${mn}"><path d="M100 116 L98.8 112 L100 84 L101.2 112Z" fill="#2b1d14"/></g>
+ <circle cx="100" cy="112" r="2.4" fill="#c99a44" stroke="#2b1d14" stroke-width=".6"/>
+ <circle cx="100" cy="112" r="35.5" fill="url(#wglass)"/></g></svg>`;}
 function storyPanel(){const host=document.getElementById('workpage-dossier');if(!host)return;let p=host.querySelector('.story-panel');
  if(!p){p=document.createElement('section');p.className='panel story-panel';const after=host.querySelector('.archive-panel');(after||host.firstChild)?.after?after.after(p):host.append(p);}
  const done=new Set(save.completed||[]);const n=done.size;
  p.innerHTML=`<h2>懷錶的秘密</h2><p class="sp-intro">每破一案，就能找回一片銀懷錶的零件，以及老莊主的一頁日記。集滿十片，真相就會浮現。<b>已找回 ${n}／10</b></p>
- <div class="sp-watch"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="54" r="38" fill="none" stroke="#c9a35b" stroke-width="4"/><circle cx="50" cy="54" r="31" fill="#f6ecd4" stroke="#8a6a48" stroke-width="1.5"/><rect x="45" y="5" width="10" height="9" rx="2" fill="#c9a35b"/>${[...Array(10)].map((_,k)=>{const a=(k/10)*Math.PI*2-Math.PI/2,x=50+24*Math.cos(a),y=54+24*Math.sin(a);return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${done.has(k)?'#c9a35b':'#e2d3b3'}" stroke="#8a6a48" stroke-width="1"/>`}).join('')}<line x1="50" y1="54" x2="50" y2="${n===10?36:44}" stroke="#3d2817" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="54" x2="${n===10?62:56}" y2="${n===10?62:58}" stroke="#3d2817" stroke-width="2" stroke-linecap="round"/><circle cx="50" cy="54" r="2.5" fill="#3d2817"/></svg></div>
+ <div class="sp-watch">${watchSVG(done,n)}</div>
  <div class="sp-grid">${FR.map((f,k)=>`<button type="button" class="sp-slot${done.has(k)?' got':''}" data-k="${k}" ${done.has(k)?'':'disabled'}><b>${String(k+1).padStart(2,'0')}</b><span>${done.has(k)?f[0]:'？？？'}</span></button>`).join('')}</div>
  ${n===10?`<button type="button" class="btn sp-final">拼回懷錶，揭開真相 →</button>`:''}`;
  p.querySelectorAll('.sp-slot.got').forEach(b=>b.onclick=()=>diary(+b.dataset.k));
@@ -2552,7 +2595,7 @@ if(ov)new MutationObserver(()=>{if(ov.classList.contains('hidden'))ov.querySelec
 const notes=document.getElementById('workpage-notes');
 if(notes){
  const sec=document.createElement('section');sec.className='panel board-panel';
- sec.innerHTML=`<h2>線索板</h2><p class="bd-help">拖曳人物和線索卡自由排列。開啟「紅線」後，依序點兩個人物就能連起來（再連一次會取消）。</p>
+ sec.innerHTML=`<h2>線索板</h2><p class="bd-help">拖曳人物和線索卡自由排列，點便條可展開全文。開啟「紅線」後，依序點兩個人物就能連起來（再連一次會取消）。</p>
  <div class="bd-tools"><select class="bd-pick" aria-label="選擇要釘上的線索"><option value="">📌 釘上一條線索…</option></select><button type="button" class="bd-line" aria-pressed="false">紅線</button><button type="button" class="bd-clear">清空</button></div>
  <div class="bd-board"><svg class="bd-svg"></svg></div>`;
  const memoPanel=notes.querySelector('.panel:has(#memo)')||notes.querySelector('.panel');(memoPanel||notes.firstChild).after(sec);
@@ -2565,7 +2608,7 @@ if(notes){
  const clues=()=>[...document.querySelectorAll('#clues li')].map(li=>li.textContent.trim());
  function draw(){board.querySelectorAll('.bd-item').forEach(e=>e.remove());
   for(let i=0;i<6;i++){const [x,y]=B.pos['p'+i];const d=document.createElement('div');d.className='bd-item bd-person'+(first===i?' sel':'');d.dataset.id='p'+i;d.style.left=x+'%';d.style.top=y+'%';d.innerHTML=portrait(i,true)+`<span>${names[i]}</span>`;board.append(d);}
-  const cl=clues();B.notes.forEach((n,k)=>{const d=document.createElement('div');d.className='bd-item bd-note';d.dataset.id='n'+k;d.style.left=n.x+'%';d.style.top=n.y+'%';d.innerHTML=`<b>${n.i+1}</b>${cl[n.i]||''}<button type="button" class="bd-x" aria-label="取下">×</button>`;board.append(d);});
+  const cl=clues();B.notes.forEach((n,k)=>{const d=document.createElement('div');d.className='bd-item bd-note';d.dataset.id='n'+k;d.style.left=n.x+'%';d.style.top=n.y+'%';d.innerHTML=`<b>${n.i+1}</b><span class="bd-t">${cl[n.i]||''}</span><button type="button" class="bd-x" aria-label="取下">×</button>`;board.append(d);});
   lines();
   pick.innerHTML='<option value="">📌 釘上一條線索…</option>'+cl.map((c,k)=>`<option value="${k}">${k+1}. ${c.slice(0,22)}${c.length>22?'…':''}</option>`).join('');}
  function center(id){const e=board.querySelector(`[data-id="${id}"]`);if(!e)return null;const b=board.getBoundingClientRect(),r=e.getBoundingClientRect();return [r.left-b.left+r.width/2,r.top-b.top+Math.min(r.height/2,28)];}
@@ -2578,6 +2621,7 @@ if(notes){
   const {b,it}=drag;let x=(e.clientX-b.left-drag.dx)/b.width*100,y=(e.clientY-b.top-drag.dy)/b.height*100;x=Math.max(0,Math.min(100-it.offsetWidth/b.width*100,x));y=Math.max(0,Math.min(100-it.offsetHeight/b.height*100,y));it.style.left=x+'%';it.style.top=y+'%';
   if(drag.id[0]==='p')B.pos[drag.id]=[x,y];else{const n=B.notes[+drag.id.slice(1)];n.x=x;n.y=y;}lines();});
  board.addEventListener('pointerup',()=>{if(!drag)return;const {it,id,moved}=drag;it.classList.remove('drag');drag=null;keep();
+  if(!moved&&id[0]==='n'){it.classList.toggle('open');it.style.zIndex=it.classList.contains('open')?6:'';const bw=board.clientWidth,bh=board.clientHeight;const k=+id.slice(1),n=B.notes[k];const x=Math.min(n.x,100-it.offsetWidth/bw*100),y=Math.min(n.y,100-it.offsetHeight/bh*100);it.style.left=Math.max(0,x)+'%';it.style.top=Math.max(0,y)+'%';if(!it.classList.contains('open')){it.style.left=n.x+'%';it.style.top=n.y+'%';}return;}
   if(!moved&&lineMode&&id[0]==='p'){const i=+id.slice(1);if(first===null){first=i;}else if(first===i){first=null;}else{const a=Math.min(first,i),c=Math.max(first,i);const k=B.links.findIndex(l=>l[0]===a&&l[1]===c);k>=0?B.links.splice(k,1):B.links.push([a,c]);first=null;keep();if(audioOn)sfx.soft();}draw();}});
  board.addEventListener('click',e=>{const x=e.target.closest('.bd-x');if(!x)return;const k=+x.parentElement.dataset.id.slice(1);B.notes.splice(k,1);keep();draw();});
  pick.onchange=()=>{if(pick.value==='')return;const i=+pick.value;B.notes.push({i,x:6+Math.random()*50,y:60+Math.random()*25});keep();draw();if(audioOn)sfx.place();pick.value='';};
@@ -2650,7 +2694,71 @@ if(notes){
 .bd-x{position:absolute;right:2px;top:0;border:0;background:none;font-size:18px;color:#7d5a38;cursor:pointer;padding:2px 6px}
 .board-panel h2,.story-panel h2{display:flex;align-items:center;gap:8px}
 </style>
-<script>
+<style>
+/* 便條縮小：預設兩行，點開看全文 */
+.bd-note{width:min(30%,150px)!important;padding:7px 18px 6px 8px!important;font-size:12px!important;line-height:1.4!important}
+.bd-note b{float:left;margin-right:4px}
+.bd-note .bd-t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bd-note.open{width:min(62%,240px)!important;font-size:14px!important;transform:rotate(0)!important}
+.bd-note.open .bd-t{display:inline;-webkit-line-clamp:unset}
+.bd-x{font-size:15px!important;padding:0 4px!important}
+@media (max-width:520px){.bd-person{width:17%!important;padding:3px 3px 0!important}.bd-person span{font-size:10px!important;line-height:1.5!important}}
+</style><style>
+.top{position:relative}
+.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+.amb-toggle{position:static!important;white-space:nowrap;margin:0;padding:6px 12px!important;font-size:12px!important;box-shadow:0 2px 6px #0005!important}
+.sp-watch{width:min(240px,70vw)!important;margin:4px auto 14px!important;filter:none!important}
+.sp-watch svg{display:block;width:100%;height:auto}
+.story-panel .sp-intro b{font-size:18px}
+</style><style>.case-intro.waiting .ci-story:after{content:""}.ci-tap{display:inline-block;padding:8px 14px;border:1.5px dashed #8a6a48;border-radius:6px;color:#6b4a2d;font-family:"Noto Serif TC",serif;animation:tapPulse 1.6s ease-in-out infinite}@keyframes tapPulse{50%{opacity:.45}}.case-intro.waiting .ci-skip{visibility:hidden}</style><script>
+(function(){const g=document.querySelector('details.guide');if(!g)return;g.innerHTML='<summary><span class="g-ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg></span><span class="g-t">偵探守則<small>第一次調查？查看遊戲玩法</small></span></summary><ol><li><b>讀線索</b>官方線索全部可信；詢問室裡有一個人說了謊，先保留懷疑。</li><li><b>放人物</b>點一張嫌疑人照片，再點地圖上的房間放入。</li><li><b>一人一房</b>每個房間恰好一人，每個人也只會出現一次。</li><li><b>排除</b>長按空房間標記 ❌；點已放人的房間可以移除或換人。</li><li><b>提交推理</b>六人都放好後按「提交推理」，再揪出說謊者、比對物證。</li></ol><p class="example"><b>技巧</b>先找「同一排／同一欄」的線索，能最快縮小範圍。</p>';})();
+</script>
+<style>
+/* FINAL19：教學卡排版 */
+.tour-card{width:min(340px,calc(100vw - 32px))!important;max-width:none!important;padding:18px 18px 14px!important}
+.tour-card p{font-size:15px!important;line-height:1.7!important}
+.tour-btns{display:flex!important;flex-wrap:nowrap;align-items:center;gap:8px}
+.tour-btns button{writing-mode:horizontal-tb!important;white-space:nowrap!important;width:auto!important;min-width:0!important;flex:none!important;height:auto!important;line-height:1.2!important}
+.tour-btns .tour-skip{margin-right:auto}
+.tour-btns span{display:none}
+.tour-step{font-family:Georgia,serif}
+/* 分頁：檔案索引標籤 */
+.workspace-nav,[role=tablist]{background:linear-gradient(#5a3d24,#432c19)!important;border:0!important;border-radius:8px 8px 0 0!important;padding:10px 10px 0!important;gap:6px!important;box-shadow:inset 0 2px 6px #0007,0 4px 10px #4a301e33!important}
+.workspace-tab{position:relative;border:0!important;border-radius:10px 10px 0 0!important;background:linear-gradient(#e2c592,#cfac72)!important;color:#4a301e!important;box-shadow:inset 0 1px 0 #fff6,inset 0 -6px 8px -6px #0005!important;padding:10px 4px 12px!important;transition:transform .15s,background .15s;transform:translateY(4px)}
+.workspace-tab .tab-emoji{color:#6b4a2d}
+.workspace-tab:after{content:"";position:absolute;left:22%;right:22%;bottom:6px;height:2px;border-radius:2px;background:#8a6a4855}
+.workspace-tab[aria-selected=true]{background:linear-gradient(#fbf3e2,#f2e2c2)!important;color:#3d2817!important;transform:translateY(0);box-shadow:0 -3px 8px #0004,inset 0 2px 0 #e9c46a!important;z-index:2}
+.workspace-tab[aria-selected=true] .tab-emoji{color:#a4423b}
+.workspace-tab[aria-selected=true]:after{background:#a4423b;height:3px}
+/* 引導教學按鈕 */
+.tour-launch{display:flex!important;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(#3a2a1e,#2a1c13)!important;color:#f3e3c3!important;border:1px solid #1a110b!important;border-radius:8px!important;box-shadow:0 3px 0 #120b06,0 6px 12px #0004!important}
+.tour-launch svg{color:#e9c46a}
+/* 偵探守則 */
+details.guide{position:relative;background:linear-gradient(#fbf3e2,#efdfbf)!important;border:1px solid #b08a5c!important;border-left:6px solid #a4423b!important;border-radius:4px 10px 10px 4px!important;box-shadow:0 5px 14px #4a301e2e!important;padding:0!important;overflow:hidden}
+details.guide summary{list-style:none;display:flex;align-items:center;gap:12px;padding:14px 16px!important;cursor:pointer}
+details.guide summary::-webkit-details-marker{display:none}
+details.guide summary:after{content:"＋";margin-left:auto;width:28px;height:28px;flex:none;display:grid;place-items:center;border-radius:50%;background:#6b4a2d;color:#fff4df;font-weight:800}
+details.guide[open] summary:after{content:"－"}
+details.guide .g-ico{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:50%;background:#a4423b;color:#fff4df;box-shadow:inset 0 0 0 2px #e9c46a}
+details.guide .g-t{display:flex;flex-direction:column;font:800 18px/1.2 "Noto Serif TC",serif;color:#3d2817;letter-spacing:.05em}
+details.guide .g-t small{font:500 13px/1.5 sans-serif;color:#8a6a48;letter-spacing:0;margin-top:3px}
+details.guide ol{list-style:none;counter-reset:g;margin:0!important;padding:4px 16px 6px!important;border-top:1px dashed #b08a5c}
+details.guide li{counter-increment:g;position:relative;padding:10px 0 10px 44px!important;border-bottom:1px dashed #d8c6a5;line-height:1.6;color:#4a301e}
+details.guide li:before{content:counter(g);position:absolute;left:0;top:10px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#6b4a2d;color:#fff4df;font:700 14px Georgia,serif;box-shadow:inset 0 0 0 2px #e9c46a}
+details.guide li b{display:block;font:800 15px "Noto Serif TC",serif;color:#3d2817}
+details.guide .example{margin:8px 16px 14px!important;padding:10px 12px!important;background:#fff59a!important;border:0!important;transform:rotate(-.6deg);box-shadow:0 3px 6px #0003;color:#3d2817}
+details.guide .example b{color:#a4423b;margin-right:6px}
+</style>
+<style>
+/* 分頁：深墨色書籤，無底板 */
+.workspace-nav,[role=tablist]{background:none!important;box-shadow:none!important;border:0!important;border-bottom:3px solid #2b1d14!important;border-radius:0!important;padding:8px 2px 0!important}
+.workspace-tab{background:linear-gradient(#3d2b1e,#2b1d14)!important;color:#e8d6b2!important;box-shadow:inset 0 1px 0 #ffffff1a!important}
+.workspace-tab .tab-emoji{color:#c9a35b!important}
+.workspace-tab:after{background:#c9a35b44!important}
+.workspace-tab[aria-selected=true]{background:linear-gradient(#a4423b,#82302a)!important;color:#fff4df!important;box-shadow:0 -3px 8px #0004,inset 0 1px 0 #ffffff33!important}
+.workspace-tab[aria-selected=true] .tab-emoji{color:#ffe7b0!important}
+.workspace-tab[aria-selected=true]:after{background:#ffe7b0!important}
+</style><script>
 // FINAL8：引導式教學
 (function(){
 const KEY='btc-tour-done';
@@ -2665,7 +2773,7 @@ const steps=[
  {el:'.map-howto',tab:'scene',t:'排除不可能的房間',d:'確定某人不可能在某間時，長按那間空房間，就能標記 ❌ 排除，幫自己縮小範圍。'},
  {el:'#interviewButtons',tab:'witness',t:'詢問嫌疑人',d:'六人之中只有一人說謊。點人物聽他的證詞，找出和線索矛盾的那一位。'},
  {el:'#check',parent:true,tab:'scene',t:'提交推理',d:'六個人都放好後按「提交推理」。卡住的話可以用提示，它只會揭露確定正確的位置。'},
- {t:'準備好了！',d:'之後想再看一次教學，按頁面上的「▶ 引導教學」就可以。祝你破案順利。'}
+ {t:'準備好了！',d:'之後想再看一次教學，按案件頁上方的「引導教學」就可以。祝你破案順利。'}
 ];
 let i=0,wrap,hole,card;
 function build(){wrap=document.createElement('div');wrap.className='tour-wrap';wrap.innerHTML='<div class="tour-hole"></div><div class="tour-card" role="dialog" aria-live="polite"><div class="tour-step"></div><h3></h3><p></p><div class="tour-btns"><button type="button" class="tour-skip">略過</button><span></span><button type="button" class="tour-prev">上一步</button><button type="button" class="tour-next">下一步</button></div></div>';
@@ -2688,7 +2796,7 @@ function start(){if(!wrap)build();wrap.hidden=false;go(0);}
 let introShown=false;
 function end(){if(wrap)wrap.hidden=true;if(window.caseIntro&&!introShown){introShown=true;window.caseIntro();}try{localStorage.setItem(KEY,'1')}catch{};tab('dossier');scrollTo({top:0});}
 window.startTour=start;
-const btn=document.createElement('button');btn.type='button';btn.className='btn tour-launch';btn.textContent='▶ 引導教學';btn.onclick=start;
+const btn=document.createElement('button');btn.type='button';btn.className='btn tour-launch';btn.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor"/></svg><span>引導教學</span>';btn.onclick=start;
 const g=document.querySelector('details.guide');if(g)g.before(btn);else document.querySelector('.top')?.append(btn);
 document.addEventListener('keydown',e=>{if(!wrap||wrap.hidden)return;if(e.key==='Escape')end();if(e.key==='ArrowRight')wrap.querySelector('.tour-next').click();if(e.key==='ArrowLeft'&&i)go(i-1);});
 let seen=false;try{seen=localStorage.getItem(KEY)==='1'}catch{}
