@@ -1452,7 +1452,7 @@ while(valid.length>1){let best=null,bestValid=null,bestScore=-1;for(const c of p
 // Reduce redundant constraints while retaining exactly one solution.
 for(let i=chosen.length-1;i>=0;i--){let reduced=chosen.filter((_,j)=>j!==i);let count=0;for(const s of permutations){if(reduced.every(c=>evalC(c,s))){count++;if(count>1)break}}if(count===1)chosen=reduced;}
 const desc=c=>{let p=names[c.p],q=names[c.q];switch(c.kind){case'exact':return `${p}確定在${roomNames[c.room]}。`;case'not':return `${p}不在${roomNames[c.room]}。`;case'row':return `${p}在地圖${c.row?'下':'上'}排。`;case'col':return `${p}在地圖${['左','中','右'][c.col]}欄。`;case'sameRow':return `${p}和${q}位於同一排。`;case'diffRow':return `${p}和${q}不在同一排。`;case'sameCol':return `${p}和${q}位於同一欄。`;case'diffCol':return `${p}和${q}不在同一欄。`;case'adj':return `${p}與${q}所在房間上下或左右緊鄰（不含斜角）。`;case'notAdj':return `${p}與${q}所在房間沒有共用牆壁。`;case'before':return `依照地圖由左至右、由上到下的順序，${p}的位置在${q}之前。`;}};
-const verifiedCount=permutations.filter(candidate=>chosen.every(c=>evalC(c,candidate))).length;return {solution,clues:shuffle(chosen,r).map(desc),unique:verifiedCount===1,verifiedCount};}
+const verifiedCount=permutations.filter(candidate=>chosen.every(c=>evalC(c,candidate))).length;const sh=shuffle(chosen,r);return {solution,clues:sh.map(desc),clueObjs:sh,evalC,unique:verifiedCount===1,verifiedCount};}
 const puzzles=Array.from({length:10},(_,i)=>makePuzzle(i));let level=Math.max(0,Math.min(9,Number(save.level)||0)),mode='place',person=0,history=[];
 let accusationPending=false;
 function showAccusation(){
@@ -2319,7 +2319,7 @@ function paint(){if(!ol)return;const d=load();[...ol.children].forEach((li,i)=>{
 if(ol){ol.addEventListener('click',e=>{const li=e.target.closest('li');if(!li||li.classList.contains('revealed'))return;const i=[...ol.children].indexOf(li);let d=load();d=d.includes(i)?d.filter(x=>x!==i):[...d,i];try{localStorage.setItem(key(),JSON.stringify(d))}catch{};li.classList.toggle('done',d.includes(i));});
  ol.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('li')){e.preventDefault();e.target.click();}});
  const r=render;render=function(){r();paint();};paint();
- const h=ol.parentElement.querySelector('h2');if(h&&!h.querySelector('.clue-tip'))h.insertAdjacentHTML('afterend','<p class="clue-tip">點線索可劃掉，幫自己記錄用過的線索。</p>');}
+ const h=ol.parentElement.querySelector('h2');if(h&&!h.querySelector('.clue-tip'))h.insertAdjacentHTML('afterend','<p class="clue-tip">點線索會在地圖上標出相關位置；按右側方框可劃掉用過的線索。</p>');}
 })();
 </script>
 <style>
@@ -2784,6 +2784,120 @@ x.onclick=()=>document.getElementById('modalClose')?.click();m.prepend(x);
 ov.addEventListener('click',e=>{if(e.target===ov)document.getElementById('modalClose')?.click();});
 new MutationObserver(()=>{if(!ov.classList.contains('hidden'))ov.scrollTop=0;}).observe(ov,{attributes:true,attributeFilter:['class']});})();
 </script><script>
+// FINAL20：即時檢查、線索連動地圖、拍桌指認
+(function(){
+const ol=document.getElementById('clues');if(!ol)return;
+let live=false;try{live=localStorage.getItem('btc-live')==='1'}catch{}
+/* ---------- 1. 即時檢查 ---------- */
+const bar=document.createElement('div');bar.className='live-bar';
+bar.innerHTML='<button type="button" class="live-tog" aria-pressed="false"><span class="sw"><i></i></span>即時檢查</button><span class="live-sum"></span>';
+ol.before(bar);const tog=bar.querySelector('.live-tog'),sum=bar.querySelector('.live-sum');
+tog.onclick=()=>{live=!live;try{localStorage.setItem('btc-live',live?'1':'0')}catch{};paint();};
+function where(){const b=state().board,s=Array(6).fill(null);b.forEach((p,room)=>{if(p!==null)s[p]=room;});return s;}
+function status(c,s){const ps=[c.p,c.q].filter(x=>x!==undefined);if(ps.some(x=>s[x]===null))return 'wait';return puzzles[level].evalC(c,s)?'ok':'bad';}
+function paint(){tog.setAttribute('aria-pressed',String(live));ol.classList.toggle('live',live);
+ const objs=puzzles[level].clueObjs||[],s=where();let ok=0,bad=0;
+ [...ol.children].forEach((li,i)=>{li.classList.remove('st-ok','st-bad','st-wait');if(!live||li.classList.contains('revealed')||!objs[i])return;const st=status(objs[i],s);li.classList.add('st-'+st);if(st==='ok')ok++;if(st==='bad')bad++;});
+ sum.textContent=live?(bad?`${bad} 條矛盾`:ok===objs.length?'全部符合！':`${ok}／${objs.length} 條符合`):'放人時即時比對線索';
+ sum.className='live-sum'+(live&&bad?' bad':live&&ok===objs.length?' good':'');}
+/* ---------- 3. 線索連動地圖 ---------- */
+// 劃掉功能改由右側小勾勾負責；點線索本身 → 在地圖上標亮
+ol.addEventListener('click',e=>{const li=e.target.closest('li');if(!li||li.classList.contains('revealed'))return;
+ if(e.target.closest('.clue-chk'))return; // 交給原本的劃掉
+ e.stopImmediatePropagation();const i=[...ol.children].indexOf(li);highlight(i,li);},true);
+function decorate(){[...ol.children].forEach(li=>{if(li.classList.contains('revealed')||li.querySelector('.clue-chk'))return;const b=document.createElement('span');b.className='clue-chk';b.setAttribute('aria-label','劃掉這條線索');b.textContent='✓';li.append(b);});}
+let hlTimer;
+function highlight(i,li){const c=(puzzles[level].clueObjs||[])[i];const rooms=document.getElementById('rooms');if(!c||!rooms)return;
+ [...ol.children].forEach(x=>x.classList.toggle('focus',x===li));
+ const s=where(),set=new Set(),who=[c.p,c.q].filter(x=>x!==undefined);
+ if(c.room!==undefined)set.add(c.room);
+ if(c.row!==undefined)[0,1,2].forEach(k=>set.add(c.row*3+k));
+ if(c.col!==undefined)[0,1].forEach(k=>set.add(k*3+c.col));
+ who.forEach(p=>{if(s[p]!==null)set.add(s[p]);});
+ rooms.querySelector('.hl-layer')?.remove();const L=document.createElement('div');L.className='hl-layer';
+ L.innerHTML=[...set].map(r=>{const b=ROOM_BOX[r];const nm=who.filter(p=>s[p]===r).map(p=>names[p]).join('、');const neg=c.kind==='not'&&r===c.room;return `<div class="hl-box${neg?' neg':''}" style="left:${b[0]}%;top:${b[1]}%;width:${b[2]}%;height:${b[3]}%">${nm?`<b>${nm}</b>`:''}</div>`}).join('')+
+  `<div class="hl-cap">${li.firstChild?.textContent||''}${who.length&&who.every(p=>s[p]===null)?'<br><small>（相關人物還沒放上地圖）</small>':''}</div>`;
+ rooms.append(L);
+ document.querySelectorAll('#people .person').forEach((el,k)=>el.classList.toggle('clue-hl',who.includes(k)));
+ const sc=rooms.closest('.scene');const r=sc.getBoundingClientRect();if(r.bottom<80||r.top>innerHeight-120)sc.scrollIntoView({behavior:'smooth',block:'center'});
+ if(audioOn&&window.btcSfx)btcSfx.soft();
+ clearTimeout(hlTimer);hlTimer=setTimeout(clearHL,4500);}
+function clearHL(){document.querySelector('.hl-layer')?.remove();document.querySelectorAll('#clues li.focus').forEach(x=>x.classList.remove('focus'));document.querySelectorAll('#people .clue-hl').forEach(x=>x.classList.remove('clue-hl'));}
+document.getElementById('rooms')?.addEventListener('pointerdown',clearHL,true);
+const r0=render;render=function(){r0();decorate();paint();};decorate();paint();
+// 劃掉：只有點勾勾才觸發（原本的監聽會收到，因為 stopImmediatePropagation 只擋非勾勾的點擊）
+
+/* ---------- 4. 拍桌指認 ---------- */
+document.addEventListener('click',e=>{const b=e.target.closest('.witness-options button');if(!b||b.dataset.confirmed)return;
+ e.stopImmediatePropagation();e.preventDefault();
+ const i=[...b.parentElement.children].indexOf(b);const say=getInterview(i);
+ const w=document.createElement('div');w.className='slam-wrap';
+ w.innerHTML=`<div class="slam-card"><div class="sl-k">當面對質</div><div class="sl-who">${portrait(i,true)}<strong>${names[i]}</strong></div><blockquote>「${say}」</blockquote><p>這句證詞，和你還原的現場矛盾嗎？</p><div class="sl-btns"><button type="button" class="sl-no">再想想</button><button type="button" class="sl-yes">拍桌指認：你說謊！</button></div></div>`;
+ document.body.append(w);
+ w.querySelector('.sl-no').onclick=()=>w.remove();w.onclick=ev=>{if(ev.target===w)w.remove();};
+ w.querySelector('.sl-yes').onclick=()=>{const right=i===unreliableWitness(level);
+  const SH=document.querySelector('.app')||document.body;SH.classList.remove('shake');void SH.offsetWidth;SH.classList.add('shake');w.querySelector('.slam-card').classList.add('shake');
+  if(audioOn&&window.btcSfx){btcSfx.stamp();setTimeout(btcSfx.stamp,90);}
+  const card=w.querySelector('.slam-card');
+  if(right){card.insertAdjacentHTML('beforeend','<div class="sl-stamp">謊言識破<small>LIE EXPOSED</small></div>');
+   setTimeout(()=>{w.remove();b.dataset.confirmed='1';b.click();},1500);}
+  else{card.insertAdjacentHTML('beforeend','<div class="sl-stamp ok">證詞屬實<small>CONSISTENT</small></div>');
+   setTimeout(()=>{w.remove();b.dataset.confirmed='1';b.click();delete b.dataset.confirmed;},1500);}
+ };
+},true);
+})();
+</script>
+<style>
+/* 即時檢查 */
+.live-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 2px}
+.live-tog{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;border:1px solid #8a6a48;background:#fbf3e2;color:#3d2817;font-weight:800;font-size:14px;cursor:pointer}
+.live-tog .sw{width:34px;height:20px;border-radius:999px;background:#cbb894;position:relative;transition:background .2s}
+.live-tog .sw i{position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0005;transition:left .2s}
+.live-tog[aria-pressed=true] .sw{background:#3f7a52}.live-tog[aria-pressed=true] .sw i{left:16px}
+.live-sum{font-size:13px;color:#8a6a48}.live-sum.bad{color:#a4423b;font-weight:800}.live-sum.good{color:#3f7a52;font-weight:800}
+#clues.live li.st-ok{box-shadow:inset 4px 0 0 #3f7a52,0 1px 0 #d8c6a5,0 3px 8px #4a301e22!important}
+#clues.live li.st-ok:before{background:#3f7a52!important}
+#clues.live li.st-bad{background:#fbe9e5!important;box-shadow:inset 4px 0 0 #b3362d,0 1px 0 #d8c6a5,0 3px 8px #4a301e22!important;animation:badPulse .5s}
+#clues.live li.st-bad:before{background:#b3362d!important;content:"!"!important}
+@keyframes badPulse{30%{transform:translateX(-3px)}60%{transform:translateX(3px)}}
+/* 線索小勾 */
+#clues li{padding-right:46px!important}
+.clue-chk{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:6px;border:1.5px solid #b08a5c;display:grid;place-items:center;color:transparent;font-weight:900;cursor:pointer;background:#fff}
+#clues li.done .clue-chk{background:#3f7a52;border-color:#3f7a52;color:#fff}
+#clues li.done{text-decoration:none!important}
+#clues li.done{opacity:.5}
+#clues li.focus{outline:3px solid #e9c46a;outline-offset:1px}
+/* 地圖標亮 */
+.hl-layer{position:absolute;inset:0;z-index:40;pointer-events:none;background:#0000;animation:ciFade .2s}
+.hl-box{position:absolute;box-sizing:border-box;border:.5cqw solid #ffd666;border-radius:.6cqw;box-shadow:0 0 3cqw #ffd666,inset 0 0 3cqw #ffd66688;background:#ffd66622;animation:hlPulse 1.2s ease-in-out infinite}
+.hl-box:not(:first-child){box-shadow:0 0 3cqw #ffd666}
+.hl-box.neg{border-color:#ff6b5b;box-shadow:0 0 3cqw #ff6b5b}
+.hl-box b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#2b1d14e6;color:#ffe7b0;padding:.4cqw 1.2cqw;border-radius:999px;font-size:1.6cqw;white-space:nowrap}
+.hl-cap{position:absolute;left:2%;right:2%;bottom:1.5%;padding:.8cqw 1.4cqw;background:#2b1d14ee;color:#f6e7c8;border-left:.5cqw solid #ffd666;font:600 1.5cqw/1.4 "Noto Serif TC",serif;border-radius:.4cqw}
+@keyframes hlPulse{50%{border-color:#fff2c0}}
+@container (max-width:460px){.hl-box b{font-size:11px;padding:2px 7px}.hl-cap{font-size:11px;padding:4px 8px}}
+#people .person.clue-hl{box-shadow:0 0 0 3px #ffd666,0 8px 16px #4a301e66!important}
+/* 拍桌指認 */
+.slam-wrap{position:fixed;inset:0;z-index:2147483000;background:#120a06cc;display:grid;place-items:center;padding:16px;animation:ciFade .2s}
+.slam-card{position:relative;width:min(420px,100%);box-sizing:border-box;padding:20px;background:linear-gradient(#fbf3e2,#efdfbf);border:2px solid #6b4a2d;border-radius:10px;box-shadow:0 20px 50px #000c;color:#3d2817;overflow:hidden}
+.sl-k{font:700 11px sans-serif;letter-spacing:.25em;color:#a4423b}
+.sl-who{display:flex;align-items:center;gap:12px;margin:10px 0}
+.sl-who img{width:64px!important;height:auto!important;aspect-ratio:233/269;object-fit:cover;border:3px solid #fff!important;box-shadow:0 3px 8px #0005!important;border-radius:0!important}
+.sl-who strong{font:800 22px "Noto Serif TC",serif}
+.slam-card blockquote{margin:0 0 10px;padding:12px;background:#fffaf0;border-left:4px solid #6b4a2d;font:17px/1.7 "Courier New","Noto Serif TC",serif}
+.slam-card p{font-size:14px;color:#6b4a2d}
+.sl-btns{display:flex;gap:8px;margin-top:12px}
+.sl-btns button{flex:1;padding:12px 8px;border-radius:8px;font-weight:800;font-size:15px;cursor:pointer}
+.sl-no{background:none;border:1.5px dashed #8a6a48;color:#6b4a2d}
+.sl-yes{flex:2!important;background:linear-gradient(#b8504a,#8a332d);color:#fff;border:1px solid #6b221d;box-shadow:0 3px 0 #6b221d}
+.sl-stamp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-12deg);white-space:nowrap;padding:10px 24px;border:5px double #b3362d;color:#b3362d;background:#fbf3e2ee;font:900 34px/1.1 "Noto Serif TC",serif;letter-spacing:.15em;text-align:center;animation:stampIn .4s cubic-bezier(.3,1.5,.5,1)}
+.sl-stamp small{display:block;font:700 12px Georgia,serif;letter-spacing:.3em}
+.sl-stamp.ok{border-color:#3f7a52;color:#3f7a52}
+.shake{animation:shake .45s}
+@keyframes shake{15%{transform:translate(-6px,2px)}30%{transform:translate(5px,-3px)}45%{transform:translate(-4px,3px)}60%{transform:translate(3px,-1px)}75%{transform:translate(-2px,1px)}}
+@media (prefers-reduced-motion:reduce){body.shake,.hl-box{animation:none}}
+</style>
+<script>
 // FINAL8：引導式教學
 (function(){
 const KEY='btc-tour-done';
