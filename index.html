@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>線索之間 Between the Clues</title><meta name="description" content="線索之間 Between the Clues：在宅邸平面圖上還原六位訪客位置的推理解謎遊戲。"><style>:root{--paper:#f4ead6;--ink:#443329;--brown:#79553a;--gold:#b78b4d;--line:#d6c3a3;--green:#54715d}
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>線索之間 Between the Clues</title><meta name="description" content="線索之間 Between the Clues：在宅邸平面圖上還原六位訪客位置的推理解謎遊戲。"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC&display=swap" rel="stylesheet"><style>:root{--paper:#f4ead6;--ink:#443329;--brown:#79553a;--gold:#b78b4d;--line:#d6c3a3;--green:#54715d}
 *{box-sizing:border-box}
 body{margin:0;background:#d7c5a7;color:var(--ink);font-family:Georgia,'Noto Serif TC','Microsoft JhengHei',serif}
 button{font:inherit;cursor:pointer;touch-action:manipulation}
@@ -1957,13 +1957,15 @@ switchLevel=function(i){v15Switch(i);const transcript=document.getElementById('i
 const TAG_POS=[[1.9,32.6],[35.5,32.6],[66.9,32.6],[1.9,85.3],[35.5,85.3],[66.9,85.3]];
 const ROOM_BOX=[[1.4,2.2,31.8,36.3],[34.7,2.2,30.1,36.3],[66,2.2,32.6,36.3],[1.4,55.4,31.8,35.3],[34.7,55.4,30.1,35.3],[66,55.4,32.6,35.3]];
 let prevRoomState=null;
+const PLATES=[[1.8,1.5],[35.4,1.5],[66.8,1.5],[1.8,55.4],[35.4,55.4],[66.8,55.4]];
+const PLATE_EN=['ENTRANCE HALL','STUDY','TEA ROOM','GARDEN COURT','GALLERY','STORAGE'];
 function drawRoomTags(){const rooms=$('rooms');if(!rooms)return;let layer=rooms.querySelector('.tag-layer');if(!layer){layer=document.createElement('div');layer.className='tag-layer';}rooms.append(layer);const s=state();
 const prev=prevRoomState;prevRoomState={b:[...s.board],c:[...s.cross]};
 layer.innerHTML=TAG_POS.map(([x,y],i)=>{const p=s.board[i],c=s.cross[i],isNew=prev&&(prev.b[i]!==p||prev.c[i]!==c),an=isNew?' anim':'',r=ROOM_BOX[i];const box=`left:${r[0]}%;top:${r[1]}%;width:${r[2]}%;height:${r[3]}%`;
 let over='',cls='',body='<span class="ico">＋</span>尚未安排';
 if(p!==null){cls=' filled';body=`<span class="ico">${portrait(p,true)}</span>${names[p]}`;over=`<div class="room-mark room-filled${an}" style="${box}"><div class="room-portrait">${portrait(p,true)}</div></div>`;}
 else if(c){cls=' crossed';body='<span class="ico">❌</span>已排除';over=`<div class="room-mark room-crossed${an}" style="${box}"><span>❌</span></div>`;}
-return over+`<div class="room-tag${cls}${an}" style="left:${x}%;top:${y}%">${body}</div>`;}).join('')+'<div class="map-legend2"><span><i class="lg lg-filled"></i>已安排人物</span><span><i class="lg lg-empty">＋</i>待調查房間</span><span><i class="lg lg-crossed">❌</i>已排除</span></div>';}
+return over+`<div class="room-tag${cls}${an}" style="left:${x}%;top:${y}%">${body}</div>`;}).join('')+PLATES.map((pl,k)=>`<div class="room-plate" style="left:${pl[0]}%;top:${pl[1]}%"><b>${String(k+1).padStart(2,'0')}</b><span>${roomNames[k]}</span><i>${PLATE_EN[k]}</i></div>`).join('')+'<div class="map-legend2"><span><i class="lg lg-filled"></i>已安排人物</span><span><i class="lg lg-empty">＋</i>待調查房間</span><span><i class="lg lg-crossed">❌</i>已排除</span></div>';}
 const finalRender=render;render=function(){finalRender();drawRoomTags();};drawRoomTags();
 
 // FINAL6：點已安排／已排除的房間 → 小選單
@@ -1988,11 +1990,667 @@ tapRoom=function(i){const s=state();closeRoomMenu();
   if(chosen!==null)html+=btn('place',`放入 ${names[chosen]}`);}
  html+=btn('close','取消','ghost');
  const r=ROOM_BOX[i];const w=document.createElement('div');w.className='room-menu-wrap';
- w.innerHTML=`<div class="room-menu" style="left:${r[0]+r[2]/2}%;${i<3?`top:${r[1]+1}%`:`bottom:${100-r[1]-r[3]+1}%`}"><div class="rm-title">${title}</div>${html}</div>`;
+ w.innerHTML=`<div class="room-menu col${i%3}" style="${i%3===0?`left:${r[0]+1}%`:i%3===2?`right:${100-r[0]-r[2]+1}%`:`left:${r[0]+r[2]/2}%`};${i<3?`top:${r[1]+1}%`:`bottom:${100-r[1]-r[3]+1}%`}"><div class="rm-title">${title}</div>${html}</div>`;
  w.onclick=e=>{const a=e.target.closest('button')?.dataset.act;if(e.target===w||a==='close')return closeRoomMenu();if(a)roomAct(i,a);};
  $('rooms').append(w);};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRoomMenu();});
 </script><script>
+// FINAL9：偵探口吻旁白 ＋ 開案／結案過場
+(function(){
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const R=[
+ [/^(.+)已放置於(.+)。$/,(m,n,r)=>pick([`${n}……那晚待在${r}嗎？先這樣記下。`,`把${n}擺進${r}。看看線索怎麼說。`,`${r}——${n}。這個推測，暫且成立。`])],
+ [/^(.+)與(.+)交換了房間。$/,(m,a,b)=>`${a}和${b}互換位置。有時候真相只差一步。`],
+ [/^(.+)已位於(.+)。$/,(m,n,r)=>`${n}本來就在${r}了。`],
+ [/^已選擇(.+)，請點選要放置的房間。$/,(m,n)=>pick([`${n}……你那晚在哪裡？點一間房間。`,`盯上${n}了。他會在哪一間？`])],
+ [/^已把(.+)從(.+)移除。$/,(m,n,r)=>`把${n}從${r}撤下。再想一次。`],
+ [/^(.+)：已標記排除。$/,(m,r)=>pick([`${r}，排除。少一個可能，就離真相近一步。`,`${r}——不可能是這裡。`])],
+ [/^(.+)：已取消排除。$/,(m,r)=>`${r}，重新列入考慮。`],
+ [/^已清除(.+)的標記。$/,(m,r)=>`${r}，清空重來。`],
+ [/^請先擦除這個房間的人物，再標記排除。$/,()=>`這間已經有人了。先把人撤下，才能排除。`],
+ [/^尚未破解：目前有 (\d)\/6 個位置正確。.*$/,(m,c)=>c>=4?`差一點了。${c} 個位置是對的，有人在說謊……再看一次證詞。`:`只有 ${c} 個位置對得上。回頭重讀線索吧。`],
+ [/^尚未破解：至少有一處人物位置不正確。.*$/,()=>`有地方對不上。某個人不在你以為的房間。`],
+ [/^還有 (\d+) 個房間未放置嫌疑人。$/,(m,c)=>`還有 ${c} 間空著。每個人都得有個去處。`],
+ [/^新提示已揭露：(.+)的正確位置。$/,(m,n)=>`線報來了：${n}的位置已經確定。`],
+ [/^目前難度已無可用提示。$/,()=>`線報用完了。接下來，只能靠你自己。`],
+ [/^已識破(.+)不實的說法，接著檢查關鍵物證。$/,(m,n)=>`${n}，你說謊了。……接著看關鍵物證。`],
+ [/^✓ 指認成功，案件破解！$/,()=>`✓ 真相大白。結案。`],
+ [/^已略過證詞挑戰。$/,()=>`先不追究證詞。直接看物證。`],
+ [/^已復原上一個操作。$/,()=>`退回上一步。`],
+ [/^沒有可復原的操作。$/,()=>`沒有可以退回的步驟了。`],
+ [/^已清除人物與標記；調查筆記及證詞保留。$/,()=>`現場還原歸零。你的筆記和證詞都還在。`],
+ [/^請先閱讀線索，再選擇嫌疑人並放入地圖。$/,()=>`先讀線索。再決定誰在哪裡。`],
+ [/^請閱讀線索，還原六位嫌疑人的位置。$/,()=>`六個人，六個房間。只有一種真相。`],
+ [/^這宗案件已破解，可重新檢查你的推理。$/,()=>`這宗案子已經結了。想再走一遍推理也可以。`],
+ [/^先選嫌疑人，再點房間。$/,()=>`選一個人，再指一間房。`],
+ [/^點擊空房間可標記或取消排除。$/,()=>`點空房間，標記不可能的地方。`],
+ [/^點擊房間可清除人物或排除記號。$/,()=>`點房間，把記號擦掉。`]
+];
+const baseMsg=message;
+message=function(t){let out=t;for(const [re,f] of R){const m=String(t).match(re);if(m){out=f(...m);break;}}if(String(t).includes('指認成功'))closingFx();return baseMsg(out);};
+
+// ---- 開案過場 ----
+let shownLevel=null;
+function openingFx(){if(document.querySelector('.tour-wrap:not([hidden])'))return;
+ const n=level+1,title=titles[level],story=stories[level];
+ const w=document.createElement('div');w.className='case-intro';
+ w.innerHTML=`<div class="ci-card"><div class="ci-top"><span>CASE FILE № ${String(n).padStart(2,'0')}</span><span>ARCHIVE / 1926</span></div><div class="ci-num">第 ${n} 案</div><h2>${title}</h2><p class="ci-story"></p><div class="ci-foot"><span class="ci-stamp">CONFIDENTIAL</span><button type="button">翻開卷宗 →</button></div><div class="ci-skip">點任意處略過</div></div>`;
+ document.body.append(w);const p=w.querySelector('.ci-story');let k=0,timer;
+ const done=()=>{clearInterval(timer);p.textContent=story;w.classList.add('typed');};
+ const close=()=>{w.classList.add('out');setTimeout(()=>w.remove(),350);};
+ timer=setInterval(()=>{k++;p.textContent=story.slice(0,k);if(k>=story.length)done();},38);
+ w.onclick=()=>{w.classList.contains('typed')?close():done();};
+}
+const prevRender=render;
+render=function(){prevRender();if(shownLevel!==level){const first=shownLevel===null;shownLevel=level;setTimeout(openingFx,first?650:120);}};
+window.caseIntro=()=>setTimeout(openingFx,400);
+shownLevel=level;setTimeout(openingFx,700);
+
+// ---- 結案過場 ----
+function closingFx(){const ov=document.getElementById('overlay');const rooms=document.getElementById('rooms');if(!rooms)return;
+ document.getElementById('worktab-scene')?.click();
+ ov.style.visibility='hidden';rooms.scrollIntoView({block:'center'});
+ const marks=[...rooms.querySelectorAll('.room-filled')];marks.forEach(m=>m.classList.remove('reveal'));
+ marks.forEach((m,j)=>setTimeout(()=>m.classList.add('reveal'),250+j*230));
+ const st=document.createElement('div');st.className='closed-stamp';st.innerHTML='<b>CASE CLOSED</b><span>結　案</span>';
+ setTimeout(()=>rooms.append(st),250+marks.length*230+150);
+ setTimeout(()=>{ov.style.visibility='';st.remove();},250+marks.length*230+1900);
+}
+})();
+</script>
+<style>
+.case-intro{position:fixed;inset:0;z-index:8500;background:radial-gradient(#2b1d14ee,#120a06f5);display:grid;place-items:center;padding:16px;animation:ciFade .35s ease-out;cursor:pointer}
+.case-intro.out{animation:ciOut .35s ease-in forwards}
+@keyframes ciFade{from{opacity:0}}@keyframes ciOut{to{opacity:0}}
+.ci-card{width:min(560px,100%);box-sizing:border-box;padding:24px 26px 18px;background:linear-gradient(#f6e8cc,#e2c99d);border:2px solid #9b744c;border-radius:6px;box-shadow:0 20px 60px #000c,inset 0 0 50px #a77b4a55;color:#3d2817;transform:rotate(-1deg);animation:ciIn .55s cubic-bezier(.2,1.2,.4,1)}
+@keyframes ciIn{from{transform:translateY(30px) rotate(-4deg) scale(.92);opacity:0}}
+.ci-top{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.25em;color:#8a6a48;border-bottom:1px solid #b89670;padding-bottom:8px}
+.ci-num{margin-top:16px;font-size:14px;letter-spacing:.3em;color:#8a6a48}
+.ci-card h2{margin:4px 0 12px;font-size:28px;letter-spacing:.06em}
+.ci-story{min-height:4.8em;margin:0;font-size:16px;line-height:1.8;font-family:"Courier New","Noto Serif TC",serif}
+.ci-story:after{content:'▍';animation:blink .8s steps(1) infinite;color:#8a6a48}
+.typed .ci-story:after{content:''}
+@keyframes blink{50%{opacity:0}}
+.ci-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+.ci-stamp{border:2px solid #a4423b;color:#a4423b;padding:3px 10px;font-size:12px;letter-spacing:.25em;transform:rotate(-6deg);opacity:.85}
+.ci-foot button{font:inherit;font-weight:700;font-size:15px;padding:9px 16px;border-radius:8px;border:1.5px solid #6b4a2d;background:#6b4a2d;color:#fff4df;opacity:0;transition:opacity .3s;cursor:pointer}
+.typed .ci-foot button{opacity:1}
+.ci-skip{text-align:center;font-size:11px;color:#9b7a55;margin-top:10px}
+.room-filled.reveal{animation:rvGlow .6s ease-out}
+.room-filled.reveal .room-portrait{animation:rpIn .45s cubic-bezier(.3,1.4,.5,1)}
+@keyframes rvGlow{0%{box-shadow:0 0 0 .2cqw #6b4a2d,0 0 7cqw #fff2c0,inset 0 0 7cqw #ffe39b}}
+.closed-stamp{position:absolute;left:50%;top:46%;z-index:70;transform:translate(-50%,-50%) rotate(-9deg);border:.8cqw double #b3362d;color:#b3362d;background:#f6e8ccdd;padding:1.2cqw 4cqw;text-align:center;border-radius:1cqw;pointer-events:none;animation:stampIn .45s cubic-bezier(.3,1.5,.5,1);box-shadow:0 1cqw 3cqw #0008}
+.closed-stamp b{display:block;font-size:6.5cqw;letter-spacing:.12em;line-height:1.1;font-family:Georgia,serif}
+.closed-stamp span{display:block;font-size:3cqw;letter-spacing:.5em;font-weight:800}
+@keyframes stampIn{0%{transform:translate(-50%,-50%) rotate(-9deg) scale(2.8);opacity:0}70%{transform:translate(-50%,-50%) rotate(-9deg) scale(.95);opacity:1}}
+@media (prefers-reduced-motion:reduce){.case-intro,.ci-card,.closed-stamp,.room-filled.reveal{animation:none}}
+</style>
+<script>
+// FINAL10：分頁線條圖示 ＋ 旁白框
+(function(){
+const sv=p=>`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICON={
+ dossier:sv('<path d="M3.5 7.5V18a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5V9a1.5 1.5 0 0 0-1.5-1.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5z"/><path d="M7 12h10M7 15.5h6"/>'),
+ scene:sv('<rect x="3.5" y="4" width="17" height="16" rx="1.2"/><path d="M3.5 11.5h17M9.5 4v7.5M14.5 4v7.5M9.5 14v6M14.5 14v6"/><path d="M3.5 14h17"/>'),
+ witness:sv('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.3 2.8-5.2 5.5-5.2s4.9 1.9 5.5 5.2"/><path d="M15 5.5h5.5v4.5h-3l-2 1.8V10H15z"/>'),
+ notes:sv('<path d="M6 3.5h10.5a1.5 1.5 0 0 1 1.5 1.5v14.5a1 1 0 0 1-1 1H6a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M8 8h7M8 11.5h7M8 15h4"/><path d="M20.5 9.5l-3.5 7"/>')
+};
+for(const id in ICON){const e=document.querySelector('#worktab-'+id+' .tab-emoji');if(e)e.innerHTML=ICON[id];}
+// 旁白：每次更新時淡入
+const st=document.getElementById('status');
+if(st){st.classList.add('narrator');new MutationObserver(()=>{st.classList.remove('say');void st.offsetWidth;st.classList.add('say');}).observe(st,{childList:true,characterData:true,subtree:true});}
+})();
+</script>
+<style>
+.workspace-tab .tab-emoji{display:inline-grid;place-items:center;line-height:0}
+.workspace-tab .tab-emoji svg{display:block}
+#status.narrator{position:relative;padding:22px 16px 12px 18px!important;font-family:"Noto Serif TC","Songti TC",Georgia,serif;font-style:italic;font-size:16px;line-height:1.65;color:#3d2817;background:linear-gradient(#fbf3e2,#f1e2c4)!important;border-left:4px solid #8a6a48!important}
+#status.narrator::before{content:"偵探旁白 · NARRATOR";position:absolute;left:18px;top:6px;font-style:normal;font-size:10px;letter-spacing:.2em;color:#9b7a55;font-family:inherit}
+#status.say{animation:sayIn .35s ease-out}
+@keyframes sayIn{from{opacity:0;transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){#status.say{animation:none}}
+</style>
+<script>
+// FINAL11：標題圖示統一 ＋ 卷宗美術
+(function(){
+const sv=p=>`<svg class="h-ico" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I={
+ '卷宗':sv('<path d="M3.5 7.5V18a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5V9a1.5 1.5 0 0 0-1.5-1.5h-7L10 5H5a1.5 1.5 0 0 0-1.5 1.5z"/><path d="M7 12h10M7 15.5h6"/>'),
+ '現場':sv('<rect x="3.5" y="4" width="17" height="16" rx="1.2"/><path d="M3.5 11.5h17M9.5 4v7.5M14.5 4v7.5M9.5 14v6M14.5 14v6M3.5 14h17"/>'),
+ '線索':sv('<circle cx="10.5" cy="10.5" r="5.5"/><path d="M14.5 14.5 20 20"/>'),
+ '詢問':sv('<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.3 2.8-5.2 5.5-5.2s4.9 1.9 5.5 5.2"/><path d="M15 5.5h5.5v4.5h-3l-2 1.8V10H15z"/>'),
+ '筆記':sv('<path d="M6 3.5h10.5a1.5 1.5 0 0 1 1.5 1.5v14.5a1 1 0 0 1-1 1H6a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M8 8h7M8 11.5h7M8 15h4"/>'),
+ '關係':sv('<circle cx="6" cy="7" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.3 8.2 10.8 15.8M15.7 8.2l-2.5 7.6M8.5 7h7"/>'),
+ '備份':sv('<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>'),
+ '難度':sv('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>')
+};
+document.querySelectorAll('.workspace-page h2, .workspace-page h3, .difficulty-panel label, .backup-title').forEach(h=>{
+ const t=h.textContent.trim();const k=Object.keys(I).find(k=>t.includes(k));if(!k)return;
+ const first=h.firstChild;if(first&&first.nodeType===3){const clean=first.textContent.replace(/^[\s▧⌖▤✉️✧▣⚙︎️]+/u,'');if(clean!==first.textContent){first.textContent=clean;h.insertAdjacentHTML('afterbegin',I[k]);}}
+});
+// 卷宗：加上檔案夾分頁、迴紋針、印章
+const a=document.querySelector('.archive-panel');
+if(a&&!a.querySelector('.dz-tab')){
+ a.insertAdjacentHTML('afterbegin','<div class="dz-tab"></div><div class="dz-clip" aria-hidden="true"></div><div class="dz-stamp" aria-hidden="true">CONFIDENTIAL<br><small>機密 · 限內部調閱</small></div>');
+ const upd=()=>{const t=a.querySelector('.dz-tab');if(t)t.textContent=`CASE № ${String(level+1).padStart(2,'0')}`;};
+ upd();const r=render;render=function(){r();upd();};
+}
+})();
+</script>
+<style>
+/* ---- 標題圖示 ---- */
+.h-ico{vertical-align:-.14em;margin-right:.35em;color:#8a6a48}
+.difficulty-panel label .h-ico{margin-right:.3em}
+
+/* ---- 卷宗：牛皮紙檔案夾 ---- */
+.workspace-page .archive-panel{position:relative!important;margin-top:30px!important;padding:26px 24px 22px!important;border-radius:2px 8px 8px 8px!important;border:1px solid #b08a5c!important;
+ background:
+  radial-gradient(120% 80% at 10% 0%,#ffffff22,transparent 60%),
+  repeating-linear-gradient(0deg,#0000 0 3px,#8a6a480a 3px 4px),
+  linear-gradient(#e9cf9f,#dcbb83)!important;
+ box-shadow:0 2px 0 #b08a5c,0 6px 0 -1px #cfae78,0 7px 0 -1px #b08a5c,0 14px 30px #4a301e44!important}
+.archive-panel .dz-tab{position:absolute;left:-1px;top:-27px;height:27px;padding:0 18px;display:flex;align-items:center;font:700 12px/1 Georgia,"Noto Serif TC",serif;letter-spacing:.2em;color:#5a3d24;background:linear-gradient(#efd7aa,#e9cf9f);border:1px solid #b08a5c;border-bottom:0;border-radius:8px 10px 0 0}
+.archive-panel .dz-clip{position:absolute;right:34px;top:-14px;width:20px;height:58px;border:3px solid #9aa0a6;border-bottom:0;border-radius:10px 10px 0 0;box-shadow:inset 0 0 0 3px #0000,1px 1px 0 #0003}
+.archive-panel .dz-clip:after{content:"";position:absolute;left:3px;top:6px;width:8px;height:40px;border:3px solid #b9bfc5;border-bottom:0;border-radius:6px 6px 0 0}
+.archive-panel .dz-stamp{position:absolute;right:18px;top:64px;transform:rotate(8deg);border:2.5px solid #a4423bcc;color:#a4423bcc;padding:5px 10px;font:800 13px/1.15 Georgia,serif;letter-spacing:.2em;text-align:center;border-radius:4px;pointer-events:none;mix-blend-mode:multiply}
+.archive-panel .dz-stamp small{font-size:9px;letter-spacing:.15em;font-weight:700}
+.archive-panel .archive-top{padding-right:56px;color:#6b4a2d!important;border-bottom:1px dashed #9b744c!important}
+.archive-panel h2{color:#3d2817!important;padding-right:120px}
+
+/* 表單式欄位 */
+.archive-panel .archive-metadata{display:flex;flex-wrap:wrap;gap:8px 18px!important;margin:14px 0!important}
+.archive-panel .archive-metadata span{background:none!important;border:0!important;border-bottom:1.5px solid #7d5a38!important;border-radius:0!important;padding:2px 2px 3px!important;font-family:"Courier New","Noto Serif TC",monospace!important;color:#3d2817!important}
+
+/* 調查問題：打字機紙條 */
+.archive-panel .archive-question{position:relative;background:#fbf4e3!important;padding:14px 16px 14px 46px!important;border:1px solid #c9ad84!important;box-shadow:2px 3px 0 #b08a5c55;transform:rotate(-.6deg);font-family:"Courier New","Noto Serif TC",serif}
+.archive-panel .archive-question:before{content:"Q.";position:absolute;left:14px;top:12px;font:700 20px Georgia,serif;color:#a4423b}
+
+/* 時間軸：索引卡 */
+.archive-panel .archive-timeline{display:grid;gap:14px!important}
+.archive-panel .archive-event{position:relative;background:
+  linear-gradient(90deg,#0000 30px,#d97a7055 30px 31.5px,#0000 31.5px),
+  linear-gradient(#0000 34px,#9fb6cf77 34px 35px,#0000 35px),
+  #fffaf0!important;
+ border:0!important;border-radius:2px!important;padding:10px 14px 12px 42px!important;box-shadow:0 1px 0 #d8c6a5,0 4px 10px #4a301e33!important}
+.archive-panel .archive-event:nth-child(odd){transform:rotate(-.5deg)}
+.archive-panel .archive-event:nth-child(even){transform:rotate(.45deg)}
+.archive-panel .archive-event:before{content:"";position:absolute;left:50%;top:-6px;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#e86a5c,#9e2f25);box-shadow:0 2px 3px #0006}
+.archive-panel .archive-event strong{font-family:Georgia,"Noto Serif TC",serif;color:#5a3d24;letter-spacing:.05em}
+.archive-panel .archive-event p{line-height:26px!important;margin:4px 0 0!important}
+/* 封存 */
+.archive-panel .archive-event.sealed{background:repeating-linear-gradient(135deg,#efe3cb 0 10px,#e7d8bb 10px 20px)!important;overflow:hidden;color:#7d6448}
+.archive-panel .archive-event.sealed:after{content:"SEALED · 封存";position:absolute;right:-30px;top:14px;transform:rotate(18deg);background:#a4423b;color:#fff3e6;font:800 11px/1 Georgia,serif;letter-spacing:.25em;padding:6px 40px;box-shadow:0 2px 4px #0005}
+.archive-panel .archive-notes{margin-top:16px}
+.archive-panel .archive-notes summary{color:#5a3d24}
+@media (max-width:520px){.archive-panel .dz-stamp{top:auto;bottom:10px;right:10px;font-size:11px}.archive-panel h2{padding-right:0}}
+
+/* ---- 筆記本橫線對齊 ---- */
+#memo.memo{font-size:16px!important;line-height:32px!important;padding:6px 14px 0!important;
+ background:linear-gradient(#0000 31px,#cdb894 31px) 0 1px/100% 32px local,#fbf3e4!important;background-attachment:local!important;min-height:200px}
+</style>
+
+<style>
+/* FINAL12：詢問室美術 */
+.interview-panel{position:relative;overflow:hidden;background:
+ radial-gradient(70% 55% at 50% -5%,#f6d48a55,#0000 70%),
+ repeating-linear-gradient(90deg,#0000 0 46px,#00000014 46px 48px),
+ linear-gradient(#3a2a1e,#241912)!important;border:1px solid #1a110b!important;color:#ead9bb!important;box-shadow:inset 0 0 60px #000a,0 10px 24px #0005!important}
+.interview-panel:before{content:"";position:absolute;left:50%;top:-6px;width:120px;height:14px;transform:translateX(-50%);background:linear-gradient(#5a5048,#2c2622);border-radius:0 0 60px 60px;box-shadow:0 6px 30px 10px #f6d48a40}
+.interview-panel>*{position:relative}
+.interview-panel h2{color:#f3e3c3!important;border-color:#f3e3c333!important}
+.interview-panel h2 .h-ico{color:#e9c46a}
+.interview-panel .interview-intro{color:#cbb894!important}
+/* 嫌疑人：檔案照 */
+.interview-buttons{gap:12px!important}
+.interview-panel .interview-button{position:relative;padding:8px 8px 0!important;border:0!important;border-radius:2px!important;background:#f1e6cf!important;box-shadow:0 4px 10px #000a!important;color:#2b1d14!important;transition:transform .15s}
+.interview-panel .interview-button:nth-child(odd){transform:rotate(-1.2deg)}.interview-panel .interview-button:nth-child(even){transform:rotate(1deg)}
+.interview-panel .interview-button:hover{transform:rotate(0) translateY(-2px)}
+.interview-panel .interview-button .mini-portrait{width:100%!important;height:auto!important;aspect-ratio:233/269;object-fit:cover;max-width:130px;margin:0 auto;border:0!important;border-radius:0!important;box-shadow:none!important;background:repeating-linear-gradient(#0000 0 9px,#0002 9px 10px)}
+.interview-panel .interview-button{width:100%;max-width:160px;justify-self:center;margin:0 auto;display:flex!important;flex-direction:column!important;align-items:stretch!important}
+.interview-panel .interview-button span{display:block!important;width:auto!important;max-width:none;text-align:center;margin:6px -8px 0!important;padding:5px 0;background:#1d1510;color:#f3e3c3;font:700 14px/1.2 Georgia,"Noto Serif TC",serif;letter-spacing:.12em}
+.interview-panel .interview-button.heard:after{content:"已問";position:absolute;right:4px;top:6px;padding:2px 6px;border:2px solid #b3362d;color:#b3362d;background:#f1e6cfcc;font:800 11px/1 sans-serif;letter-spacing:.1em;transform:rotate(12deg)}
+.interview-panel .interview-button.heard{background:#e6dcc4!important}
+.interview-panel .interview-button.active,.interview-panel .interview-button[aria-pressed=true]{outline:3px solid #e9c46a;outline-offset:2px}
+/* 審訊紀錄 */
+.interview-panel .interview-transcript{position:relative;margin-top:20px!important;padding:34px 18px 16px!important;border:0!important;border-radius:2px!important;color:#2b1d14!important;
+ background:linear-gradient(#0000 0 26px,#a4423b33 26px 27px,#0000 27px),repeating-linear-gradient(#0000 0 29px,#9fb6cf44 29px 30px) 0 27px,#fbf5e6!important;box-shadow:0 6px 16px #000b!important;transform:rotate(-.4deg)}
+.interview-panel .interview-transcript:before{content:"審訊紀錄 · INTERROGATION TRANSCRIPT";position:absolute;left:18px;top:8px;font:700 10px Georgia,serif;letter-spacing:.2em;color:#a4423b}
+.interview-panel .interview-transcript:after{content:"";position:absolute;right:-14px;top:-6px;width:70px;height:20px;transform:rotate(35deg);background:#e8dcc0cc;box-shadow:0 1px 2px #0003}
+.interview-panel .interview-speaker strong{font-family:Georgia,"Noto Serif TC",serif;font-size:17px}
+.interview-panel .interview-speaker .mini-portrait{border:3px solid #fff!important;box-shadow:0 2px 6px #0006!important;transform:rotate(-3deg)}
+.interview-panel .interview-transcript blockquote{font-family:"Courier New","Noto Serif TC",serif;font-size:17px;line-height:30px!important;border:0!important;margin:10px 0!important;padding:0 0 0 8px!important;background:none!important;color:#2b1d14!important}
+.interview-panel .interview-seal{display:inline-block!important;float:right;margin:4px 0 10px;padding:4px 10px;border:2px solid #4f7a5a;color:#4f7a5a!important;border-radius:4px;font-weight:800;letter-spacing:.15em;transform:rotate(-4deg);background:none!important}
+.interview-panel .followup-question{clear:both;border-top:1px dashed #9b744c!important;padding-top:12px!important}
+.interview-panel .followup-button{width:100%;text-align:left;border:1.5px solid #6b4a2d!important;background:#6b4a2d!important;color:#fff4df!important;border-radius:6px!important;padding:10px 12px!important;font-weight:700}
+.interview-panel .followup-button:disabled,.interview-panel .followup-button[disabled]{background:none!important;color:#6b4a2d!important;border-style:dashed!important}
+.interview-panel .followup-answer{font-family:"Courier New","Noto Serif TC",serif;font-size:16px;line-height:30px!important;color:#2b1d14!important}
+.interview-panel .interview-log summary,.interview-panel .interview-foot{color:#cbb894!important}
+.interview-panel .interview-log{border-color:#f3e3c333!important}
+.interview-panel .interview-log ul{color:#ead9bb}
+/* 人物關係：軟木板 */
+.relation-panel{position:relative;background:
+ radial-gradient(#0000 0,#00000010 1px,#0000 2px) 0 0/7px 7px,
+ radial-gradient(#ffffff18 0,#0000 1.5px) 3px 4px/9px 9px,
+ linear-gradient(#c79a63,#b5864f)!important;border:10px solid #6b4a2d!important;border-radius:4px!important;box-shadow:inset 0 0 30px #0005,0 8px 20px #0005!important;color:#2b1d14}
+.relation-panel h2{display:inline-block;background:#fbf5e6;padding:6px 14px!important;box-shadow:0 3px 6px #0004;transform:rotate(-1.5deg);border:0!important}
+.relation-panel h2:after{display:none!important}
+.relation-panel .relation-intro{background:#fbf5e6e6;padding:10px 12px;box-shadow:0 2px 5px #0003;color:#4a301e!important}
+.relation-panel .relation-people{gap:12px!important}
+.relation-panel .relation-chip{position:relative;border:0!important;border-radius:2px!important;background:#fffaf0!important;color:#2b1d14!important;font:700 15px Georgia,"Noto Serif TC",serif!important;padding:12px 6px 10px!important;box-shadow:0 3px 6px #0005!important}
+.relation-panel .relation-chip:nth-child(odd){transform:rotate(-1.5deg)}.relation-panel .relation-chip:nth-child(even){transform:rotate(1.2deg)}
+.relation-panel .relation-chip:before{content:"";position:absolute;left:50%;top:-5px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#7fb0d6,#2f5f86);box-shadow:0 2px 2px #0006}
+.relation-panel .relation-chip.active{background:#6b4a2d!important;color:#fff4df!important}
+.relation-panel .relation-chip.active:before{background:radial-gradient(circle at 35% 35%,#e86a5c,#9e2f25)}
+.relation-panel .relation-details{position:relative;margin-top:22px!important;border:0!important;border-radius:2px!important;padding:18px 16px 14px!important;background:linear-gradient(90deg,#0000 22px,#d97a7055 22px 23.5px,#0000 23.5px),#fffaf0!important;box-shadow:0 5px 12px #0006!important;transform:rotate(.5deg)}
+.relation-panel .relation-details:before{content:"";position:absolute;left:50%;top:-6px;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#e86a5c,#9e2f25);box-shadow:0 2px 3px #0006}
+.relation-panel .relation-details strong{font-family:Georgia,"Noto Serif TC",serif;color:#a4423b}
+/* 備份區標題 */
+.backup-title .h-ico{color:#8a6a48}
+</style>
+<script>
+// FINAL13：地圖頁工具列圖示
+(function(){
+const sv=p=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const T={place:[sv('<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.6-6 7-6s6.2 2 7 6"/>'),'放置'],
+ cross:[sv('<path d="M6 6l12 12M18 6 6 18"/>'),'排除'],
+ erase:[sv('<path d="M8 20h12M4.5 14.5l8-8 6 6-6.5 6.5H9z"/>'),'擦除'],
+ undo:[sv('<path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>'),'復原']};
+for(const id in T){const b=document.getElementById(id);if(b)b.innerHTML=T[id][0]+'<span>'+T[id][1]+'</span>';}
+const mk=document.querySelector('.v17-section-marker strong');
+if(mk&&!mk.querySelector('svg'))mk.insertAdjacentHTML('afterbegin',sv('<path d="M4 5.5h16v13H4z"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16.5c.6-1.8 1.8-2.7 3.2-2.7s2.6.9 3.2 2.7M14 10h4M14 13h3"/>'));
+})();
+</script>
+<style>
+/* FINAL13：地圖頁人物名冊與工具列 */
+.mode-banner{position:relative;background:linear-gradient(#fbf3e2,#f1e2c4)!important;border:1px solid #c9ad84!important;border-left:5px solid #6b4a2d!important;border-radius:2px!important;font-weight:700;color:#3d2817!important;box-shadow:0 2px 5px #4a301e22}
+.tools:has(#place){display:grid!important;grid-template-columns:repeat(4,1fr);gap:8px!important}
+.tools .btn{padding-left:4px!important;padding-right:4px!important;white-space:nowrap}
+.tools .btn{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;border-radius:6px!important;border:1px solid #8a6a48!important;background:linear-gradient(#f3e3c3,#dfc699)!important;color:#4a301e!important;box-shadow:inset 0 1px 0 #fff8,0 3px 0 #8a6a48,0 4px 8px #4a301e33!important;font-weight:800}
+.tools .btn:active{transform:translateY(2px);box-shadow:inset 0 1px 0 #fff8,0 1px 0 #8a6a48!important}
+.tools .btn.on{background:linear-gradient(#7a5535,#5a3d24)!important;color:#fff4df!important;border-color:#3d2817!important;box-shadow:inset 0 2px 4px #0006,0 1px 0 #3d2817!important}
+#cross.on{background:linear-gradient(#b8504a,#8a332d)!important}
+.v17-section-marker strong{display:inline-flex;align-items:center;gap:8px}
+.v17-section-marker strong svg{color:#8a6a48;width:22px;height:22px}
+
+/* 人物名冊：與詢問室一致的檔案照 */
+#people.people{gap:14px!important}
+#people .person{position:relative;display:flex!important;flex-direction:column!important;align-items:stretch!important;padding:8px 8px 0!important;border:0!important;border-radius:2px!important;background:#f1e6cf!important;box-shadow:0 4px 10px #4a301e55!important;color:#2b1d14!important;transition:transform .15s,box-shadow .15s;overflow:visible!important}
+#people .person:nth-child(odd){transform:rotate(-1deg)}#people .person:nth-child(even){transform:rotate(.9deg)}
+#people .person::before{content:none!important;display:none!important}
+#people .person .portrait{width:100%!important;max-width:150px;height:auto!important;aspect-ratio:233/269;margin:0 auto;object-fit:cover;border:0!important;border-radius:0!important;box-shadow:none!important;outline:0!important}
+#people .person .person-label{display:block!important;margin:6px -8px 0!important;padding:6px 0!important;background:#1d1510!important;color:#f3e3c3!important;font:700 15px/1.2 Georgia,"Noto Serif TC",serif!important;letter-spacing:.12em;text-align:center;border:0!important}
+#people .person.chosen{transform:rotate(0) translateY(-4px)!important;box-shadow:0 0 0 3px #e9c46a,0 10px 20px #4a301e77!important;background:#fff6e2!important}
+#people .person.chosen .person-label{background:#6b4a2d!important;color:#fff4df!important}
+#people .person::after{content:none!important}
+#people .person.chosen::after{content:"✓ 選擇中"!important;display:block!important;position:absolute;left:50%;top:-12px;transform:translateX(-50%);padding:3px 10px;border-radius:999px;background:#e9c46a!important;color:#3d2817!important;font:800 12px/1.2 sans-serif;white-space:nowrap;box-shadow:0 2px 4px #0004;border:0!important}
+#people .person.placed .portrait{filter:sepia(.5) brightness(.8)}
+#people .person.placed:not(.chosen)::after{content:"已配置"!important;display:block!important;position:absolute;right:2px;top:10px;padding:2px 7px;border:2px solid #3f7a52!important;color:#3f7a52!important;background:#f1e6cfdd!important;font:800 12px/1.1 sans-serif;letter-spacing:.1em;transform:rotate(10deg);border-radius:3px}
+#people .person .badge,#people .person [class*=badge]{display:none!important}
+
+/* 人物檔案：身分卡 */
+#dossier.dossier{position:relative;background:linear-gradient(#0000 0 0),repeating-linear-gradient(0deg,#0000 0 3px,#8a6a480a 3px 4px),#efe0c0!important;border:1px solid #b08a5c!important;border-radius:6px!important;box-shadow:0 4px 12px #4a301e33!important}
+#dossier .dossier-heading{color:#6b4a2d!important;border-bottom:1px dashed #9b744c!important}
+#dossier .dossier-content .mini-portrait{border:4px solid #fff!important;border-radius:0!important;box-shadow:0 3px 8px #0005!important;transform:rotate(-2deg)}
+#dossier .dossier-content strong{font-family:Georgia,"Noto Serif TC",serif}
+
+/* 關係卡：文字對齊紅線右側 */
+.relation-panel .relation-details{padding-left:40px!important;background:linear-gradient(90deg,#0000 28px,#d97a7066 28px 29.5px,#0000 29.5px),#fffaf0!important}
+.relation-panel .relation-details p,.relation-panel .relation-details strong{margin-left:0!important;padding-left:0!important}
+</style>
+<script>
+// FINAL14：旁白移到地圖正下方＋畫面外時浮出、線索可勾選
+(function(){
+const st=document.getElementById('status'),scene=document.getElementById('rooms')?.closest('.scene');
+if(st&&scene)scene.after(st);
+const toast=document.createElement('div');toast.className='narr-toast';toast.setAttribute('aria-hidden','true');document.body.append(toast);
+let tm;
+function inView(e){const r=e.getBoundingClientRect();return r.bottom>60&&r.top<innerHeight-40&&e.offsetParent!==null;}
+if(st)new MutationObserver(()=>{const t=st.textContent.trim();if(!t||inView(st)||document.querySelector('.case-intro,.tour-wrap:not([hidden]),.ask-wrap'))return;
+ toast.innerHTML='<small>偵探旁白</small>';toast.append(document.createTextNode(t));toast.classList.add('show');clearTimeout(tm);tm=setTimeout(()=>toast.classList.remove('show'),3800);}).observe(st,{childList:true,characterData:true,subtree:true});
+toast.onclick=()=>toast.classList.remove('show');
+// 線索：點一下劃掉（每案記住）
+const ol=document.getElementById('clues');
+const key=()=>'btc-clue-'+level;
+const load=()=>{try{return JSON.parse(localStorage.getItem(key())||'[]')}catch{return[]}};
+function paint(){if(!ol)return;const d=load();[...ol.children].forEach((li,i)=>{if(li.classList.contains('revealed'))return;li.classList.toggle('done',d.includes(i));li.setAttribute('role','button');li.tabIndex=0;});}
+if(ol){ol.addEventListener('click',e=>{const li=e.target.closest('li');if(!li||li.classList.contains('revealed'))return;const i=[...ol.children].indexOf(li);let d=load();d=d.includes(i)?d.filter(x=>x!==i):[...d,i];try{localStorage.setItem(key(),JSON.stringify(d))}catch{};li.classList.toggle('done',d.includes(i));});
+ ol.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('li')){e.preventDefault();e.target.click();}});
+ const r=render;render=function(){r();paint();};paint();
+ const h=ol.parentElement.querySelector('h2');if(h&&!h.querySelector('.clue-tip'))h.insertAdjacentHTML('afterend','<p class="clue-tip">點線索可劃掉，幫自己記錄用過的線索。</p>');}
+})();
+</script>
+<style>
+/* 選擇中標籤對齊 */
+#people .person.chosen::after{max-width:none!important;right:auto!important;letter-spacing:.05em!important;font-size:12px!important;width:max-content!important;height:auto!important;min-width:0!important;line-height:1.3!important;padding:4px 12px!important;box-sizing:border-box;text-align:center}
+
+/* 旁白（地圖正下方） */
+#status.narrator{margin:12px 0!important}
+.narr-toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));z-index:8000;width:min(92vw,460px);box-sizing:border-box;transform:translate(-50%,140%);opacity:0;transition:transform .3s ease,opacity .3s;padding:10px 16px 12px;border-radius:10px;background:linear-gradient(#fbf3e2,#efdfbf);border:1.5px solid #8a6a48;border-left:5px solid #6b4a2d;box-shadow:0 8px 24px #0006;color:#3d2817;font:italic 16px/1.55 "Noto Serif TC",Georgia,serif;pointer-events:auto}
+.narr-toast small{display:block;font:normal 10px/1.4 sans-serif;letter-spacing:.2em;color:#9b7a55}
+.narr-toast.show{transform:translate(-50%,0);opacity:1}
+
+/* 調查線索：官方證據清單 */
+.panel:has(> #clues){position:relative;background:repeating-linear-gradient(0deg,#0000 0 3px,#8a6a4808 3px 4px),linear-gradient(#f9f0dc,#efdfbd)!important;border:1px solid #b08a5c!important;box-shadow:0 6px 14px #4a301e33!important}
+.panel:has(> #clues):after{content:"OFFICIAL · 可信";position:absolute;right:14px;top:16px;border:2px solid #3f7a52;color:#3f7a52;padding:3px 8px;font:800 11px/1 Georgia,sans-serif;letter-spacing:.15em;transform:rotate(6deg);border-radius:3px;opacity:.85;pointer-events:none}
+.panel:has(> #clues) h2{padding-right:110px}
+.clue-tip{display:block;font:400 13px/1.4 sans-serif;color:#9b7a55;margin:6px 0 0;letter-spacing:.05em}
+#clues.clues{list-style:none!important;counter-reset:clue;padding:0!important;margin:10px 0 14px!important;display:grid;gap:10px}
+#clues li{counter-increment:clue;position:relative;padding:12px 14px 12px 52px!important;background:#fffaf0!important;border:0!important;border-radius:3px;box-shadow:0 1px 0 #d8c6a5,0 3px 8px #4a301e22;line-height:1.7;cursor:pointer;transition:opacity .2s,background .2s;-webkit-tap-highlight-color:transparent}
+#clues li::marker{content:none}
+#clues li:before{content:counter(clue);position:absolute;left:12px;top:11px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#6b4a2d;color:#fff4df;font:700 14px/1 Georgia,serif;box-shadow:inset 0 0 0 2px #e9c46a}
+#clues li:after{content:none!important;border:0!important}
+#clues li.done{opacity:.55;background:#f3ead6!important}
+#clues li.done{text-decoration:line-through;text-decoration-color:#a4423b;text-decoration-thickness:2px}
+#clues li.done:before{content:"✓";background:#3f7a52}
+#clues li.revealed{background:#fff3c8!important;border-left:4px solid #e9c46a!important;cursor:default}
+#clues li.revealed:before{content:"!";background:#c8962e}
+#hint.btn{border-radius:6px!important;border:1px solid #8a6a48!important;background:linear-gradient(#f3e3c3,#dfc699)!important;box-shadow:inset 0 1px 0 #fff8,0 3px 0 #8a6a48!important;font-weight:800}
+</style>
+<script>
+// FINAL15：移除工具列；長按空房間 → 排除選單
+(function(){
+const rooms=document.getElementById('rooms');if(!rooms)return;
+function emptyMenu(i){const s=state();if(s.board[i]!==null||s.cross[i])return tapRoom(i);closeRoomMenu();
+ const chosen=Number.isInteger(person)?person:null;const r=ROOM_BOX[i];
+ const btn=(a,t,c='')=>`<button type="button" class="${c}" data-act="${a}">${t}</button>`;
+ const w=document.createElement('div');w.className='room-menu-wrap';
+ w.innerHTML=`<div class="room-menu col${i%3}" style="${i%3===0?`left:${r[0]+1}%`:i%3===2?`right:${100-r[0]-r[2]+1}%`:`left:${r[0]+r[2]/2}%`};${i<3?`top:${r[1]+1}%`:`bottom:${100-r[1]-r[3]+1}%`}"><div class="rm-title">${roomNames[i]}</div>${chosen!==null?btn('place',`放入 ${names[chosen]}`):''}${btn('xmark','標記 ❌ 排除','warn')}${btn('close','取消','ghost')}</div>`;
+ w.onclick=e=>{const a=e.target.closest('button')?.dataset.act;if(e.target===w||a==='close')return closeRoomMenu();
+  if(a==='xmark'){closeRoomMenu();snapshot();state().cross[i]=true;message(`${roomNames[i]}：已標記排除。`);playTone(300);render();}
+  else if(a==='place'){closeRoomMenu();mode='place';baseTapRoom(i);}};
+ rooms.append(w);}
+let timer=null,fired=false,sx=0,sy=0;
+rooms.addEventListener('pointerdown',e=>{const b=e.target.closest('button.room');if(!b)return;const i=[...rooms.querySelectorAll('button.room')].indexOf(b);fired=false;sx=e.clientX;sy=e.clientY;
+ clearTimeout(timer);timer=setTimeout(()=>{fired=true;if(navigator.vibrate)try{navigator.vibrate(15)}catch{};emptyMenu(i);},480);});
+const cancel=()=>clearTimeout(timer);
+rooms.addEventListener('pointerup',cancel);rooms.addEventListener('pointercancel',cancel);rooms.addEventListener('pointerleave',cancel);
+rooms.addEventListener('pointermove',e=>{if(Math.hypot(e.clientX-sx,e.clientY-sy)>10)cancel();});
+rooms.addEventListener('click',e=>{if(fired&&e.target.closest('button.room')){e.stopPropagation();e.preventDefault();fired=false;}},true);
+rooms.addEventListener('contextmenu',e=>{if(e.target.closest('button.room'))e.preventDefault();});
+// 一律使用放置模式
+mode='place';
+// 地圖下方小提示
+const st=document.getElementById('status');
+if(st&&!document.querySelector('.map-howto'))st.insertAdjacentHTML('beforebegin','<p class="map-howto">點房間放入人物｜點已放的房間可移除或換人｜<b>長按空房間</b>標記 ❌ 排除</p>');
+})();
+</script>
+<style>
+/* 移除工具列、模式提示與擦除切換 */
+.tools:has(#place),#modeBanner,.v17-section-marker button,#v17ActionStatus{display:none!important}
+.map-howto{margin:10px 0 0;font-size:13px;line-height:1.6;color:#7d5a38;text-align:center}
+.map-howto b{color:#a4423b}
+#rooms button.room{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+
+/* 地圖標籤：小螢幕放大字 */
+@container (max-width:460px){
+ .room-tag{margin-top:-9px;font-size:11px!important;height:auto!important;min-height:5.8%;padding:2px 6px 2px 2px!important;gap:3px!important}
+ .room-tag .ico{height:16px!important;width:16px!important;font-size:11px!important}
+ .room-tag.crossed .ico{font-size:9px!important}
+}
+
+/* 旁白：深色墨水卡 */
+#status.narrator{background:linear-gradient(#3a2a1e,#2a1c13)!important;color:#f6e7c8!important;border:1px solid #1a110b!important;border-left:4px solid #e9c46a!important;box-shadow:0 6px 14px #0004,inset 0 0 30px #0006!important}
+#status.narrator::before{color:#e9c46a!important}
+.narr-toast{background:linear-gradient(#3a2a1e,#2a1c13)!important;color:#f6e7c8!important;border-color:#1a110b!important;border-left-color:#e9c46a!important}
+.narr-toast small{color:#e9c46a!important}
+</style>
+
+<style>
+/* FINAL16：房間名牌重畫（可放大）＋選單不超出 */
+.room-plate{position:absolute;width:18.2%;height:7.4%;box-sizing:border-box;display:grid;grid-template-columns:auto 1fr;grid-template-rows:1fr auto;column-gap:.7cqw;align-items:center;padding:.4cqw .8cqw .3cqw .5cqw;background:linear-gradient(#f8eedb,#ead8b6);border:1px solid #b08a5c;border-radius:.3cqw .9cqw .9cqw .3cqw;box-shadow:0 .2cqw .5cqw #0005;color:#3d2817;pointer-events:none;overflow:hidden}
+.room-plate b{grid-row:1/3;background:#2b1d14;color:#f3e3c3;font:700 1.25cqw/1 Georgia,serif;padding:.45cqw .6cqw;border-radius:.2cqw}
+.room-plate span{font:800 1.6cqw/1.1 "Noto Serif TC",serif;white-space:nowrap}
+.room-plate i{font:normal .8cqw/1.1 Georgia,serif;letter-spacing:.12em;color:#7d5a38;white-space:nowrap}
+@container (max-width:460px){
+ .room-plate{width:auto;min-width:18.2%;height:auto;min-height:7.4%;padding:2px 7px 2px 2px;column-gap:4px;grid-template-rows:1fr}
+ .room-plate b{grid-row:1;font-size:10px;padding:2px 4px}
+ .room-plate span{font-size:13px}
+ .room-plate i{display:none}
+ .room-tag{font-size:10px!important}
+}
+.room-menu.col0{transform:none!important}
+.room-menu.col2{transform:none!important;left:auto!important}
+@keyframes rmIn2{from{opacity:0;transform:scale(.94)}}
+.room-menu.col0,.room-menu.col2{animation-name:rmIn2}
+@media (max-width:700px){.room-menu{min-width:0!important;width:min(52vw,220px)}}
+</style>
+<style>
+/* FINAL17：案件抬頭、案件抽屜、筆記本、備份、按鈕層次 */
+/* 抬頭：案件封面 */
+.intro{position:relative;background:linear-gradient(#0000,#0000),repeating-linear-gradient(0deg,#0000 0 3px,#8a6a4808 3px 4px),linear-gradient(#f7ecd6,#ecdab6)!important;border:1px solid #c9ad84!important;border-left:6px solid #6b4a2d!important;box-shadow:0 6px 16px #4a301e26!important;padding-right:20px!important}
+.intro h1{letter-spacing:.04em}
+.intro #story{font-family:"Courier New","Noto Serif TC",serif}
+.intro:after{border:2px solid #a4423b!important;color:#a4423b!important;font-weight:800!important;transform:rotate(-3deg)}
+/* 案件選單：檔案櫃抽屜 */
+#cases.cases{gap:10px!important;padding:12px!important;background:linear-gradient(#5a3d24,#432c19)!important;border-radius:6px;box-shadow:inset 0 2px 8px #0008,0 4px 10px #4a301e33}
+#cases .case{position:relative;border:0!important;border-radius:3px!important;background:linear-gradient(#e9cf9f,#d6b47c)!important;box-shadow:inset 0 1px 0 #fff6,0 3px 0 #2b1d14,0 4px 6px #0006!important;color:#3d2817!important;font:700 20px/1 Georgia,serif!important;padding:10px 4px 9px!important}
+#cases .case:before{content:"";position:absolute;left:50%;bottom:6px;width:26px;height:5px;margin-left:-13px;border-radius:3px;background:linear-gradient(#c9a35b,#7d5a28);box-shadow:0 1px 0 #fff5}
+#cases .case small{display:block;white-space:nowrap;margin:6px auto 9px;width:fit-content;max-width:100%;box-sizing:border-box;padding:2px 4px;background:#fbf3e2;border:1px solid #9b744c;font:600 10px/1.3 "Noto Serif TC",sans-serif!important;letter-spacing:0;color:#6b4a2d}
+@media (max-width:420px){#cases .case small{font-size:9px!important;padding:1px 3px}}
+#cases .case.active{background:linear-gradient(#fbf1dd,#ecd9b6)!important;transform:translateY(-3px);box-shadow:0 0 0 2px #e9c46a,0 6px 10px #000a!important}
+#cases .case.active small{background:#6b4a2d;color:#fff4df;border-color:#3d2817}
+#cases .case.done:after{content:"結案";position:absolute;right:3px;bottom:3px;padding:1px 4px;border:1.5px solid #a4423b;color:#a4423b;font:800 10px/1.2 sans-serif;transform:rotate(12deg);background:#f6e8ccdd;border-radius:2px}
+
+/* 推理筆記：皮革筆記本 */
+#workpage-notes .panel:has(#memo){position:relative;background:linear-gradient(#5a3d24,#3d2817)!important;border:0!important;border-radius:6px 14px 14px 6px!important;padding:18px 18px 18px 30px!important;box-shadow:0 10px 24px #0005,inset 0 0 0 2px #7a5535!important}
+#workpage-notes .panel:has(#memo):before{content:"";position:absolute;left:10px;top:16px;bottom:16px;width:8px;background:repeating-linear-gradient(#0000 0 14px,#c9b27e 14px 20px,#0000 20px 28px);border-radius:4px}
+#workpage-notes .panel:has(#memo) h2{color:#f3e3c3!important;border-color:#f3e3c333!important}
+#workpage-notes .panel:has(#memo) h2 .h-ico{color:#e9c46a}
+#workpage-notes .memo-label{color:#e9c46a!important}
+#workpage-notes .memo-label small{color:#cbb894!important}
+#memo.memo{border:0!important;border-radius:2px 8px 8px 2px!important;box-shadow:0 4px 10px #0006!important;padding-left:44px!important;
+ background:linear-gradient(90deg,#0000 34px,#d97a7077 34px 35.5px,#0000 35.5px) 0 0/100% 100% local,linear-gradient(#0000 31px,#cdb894 31px) 0 1px/100% 32px local,#fbf3e4!important}
+
+/* 備份：檔案箱標籤 */
+.backup-panel{position:relative;background:linear-gradient(#d9bc8c,#c9a571)!important;border:1px solid #8a6a48!important;border-radius:4px!important;box-shadow:inset 0 0 0 6px #0000,0 6px 14px #4a301e33!important}
+.backup-panel:before{content:"";position:absolute;inset:8px;border:1.5px dashed #6b4a2d66;border-radius:3px;pointer-events:none}
+.backup-panel .backup-title{display:inline-flex;align-items:center;background:#fbf3e2;padding:6px 12px;border:1px solid #9b744c;box-shadow:0 2px 4px #0003;color:#3d2817!important}
+.backup-panel p{color:#4a301e!important}
+.backup-actions .btn{background:#fbf3e2!important;border:1px solid #8a6a48!important;border-radius:6px!important;box-shadow:0 3px 0 #8a6a48!important;color:#4a301e!important}
+
+/* 按鈕層次：提交（主）＞提示（次）＞重設（輔） */
+#check.btn{background:linear-gradient(#4f7a5a,#355a40)!important;color:#fff8ea!important;border:1px solid #23402c!important;border-radius:8px!important;box-shadow:inset 0 1px 0 #fff4,0 4px 0 #23402c,0 6px 12px #0004!important;font-weight:800!important;letter-spacing:.08em;font-size:18px!important}
+#check.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #23402c!important}
+#hint.btn{background:#fff6dc!important;color:#7a5a1e!important;border:2px solid #c8962e!important;border-radius:8px!important;box-shadow:0 3px 0 #c8962e88!important}
+#reset.btn{background:transparent!important;color:#8a5a48!important;border:1.5px dashed #b89670!important;border-radius:8px!important;box-shadow:none!important;font-weight:600!important}
+#reset.btn:hover{color:#a4423b!important;border-color:#a4423b!important}
+.tools:has(#check){display:grid!important;grid-template-columns:2fr 1fr;gap:10px!important}
+</style>
+<script>
+// FINAL18：音效／環境音、詢問演出、主線串連、線索板
+(function(){
+/* ================= 1. 音效 ================= */
+let ctx=null;
+const AC=()=>{try{ctx??=new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume();}catch{}return ctx;};
+function noiseBuf(c,sec){const b=c.createBuffer(1,c.sampleRate*sec,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b;}
+function burst({f=800,q=1,type='bandpass',dur=.08,vol=.25,at=0}){const c=AC();if(!c)return;const t=c.currentTime+at,s=c.createBufferSource(),fl=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,dur+.05);fl.type=type;fl.frequency.value=f;fl.Q.value=q;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(fl).connect(g).connect(c.destination);s.start(t);s.stop(t+dur+.05);}
+function tone({f=440,dur=.2,vol=.1,type='sine',at=0,slide=0}){const c=AC();if(!c)return;const t=c.currentTime+at,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(f*slide,t+dur);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g).connect(c.destination);o.start(t);o.stop(t+dur+.02);}
+const sfx={
+ place(){tone({f:150,dur:.12,vol:.22,slide:.6});burst({f:500,q:2,dur:.06,vol:.35});burst({f:420,q:2,dur:.07,vol:.28,at:.16});tone({f:130,dur:.1,vol:.16,slide:.6,at:.16});},
+ soft(){burst({f:700,q:1.5,dur:.08,vol:.18});},
+ stamp(){tone({f:90,dur:.18,vol:.35,slide:.5});burst({f:300,type:'lowpass',dur:.12,vol:.5});burst({f:2500,q:.8,dur:.05,vol:.08,at:.02});},
+ paper(){const c=AC();if(!c)return;const t=c.currentTime,s=c.createBufferSource(),fl=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,.4);fl.type='bandpass';fl.Q.value=.7;fl.frequency.setValueAtTime(1800,t);fl.frequency.linearRampToValueAtTime(4200,t+.3);g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.12,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+.33);s.connect(fl).connect(g).connect(c.destination);s.start(t);s.stop(t+.4);},
+ type(){burst({f:3200,q:3,dur:.018,vol:.05});},
+ error(){tone({f:160,dur:.16,vol:.15,type:'triangle'});tone({f:120,dur:.2,vol:.12,type:'triangle',at:.12});},
+ chime(){[0,.9,1.8].forEach(at=>{[880,1320,1760,2640].forEach((f,k)=>tone({f,dur:1.6,vol:.07/(k+1),at}));});}
+};
+window.btcSfx=sfx;
+const baseTone=playTone;
+playTone=function(f){if(!audioOn)return;({440:sfx.place,300:sfx.stamp,330:sfx.soft,410:sfx.paper,240:sfx.error}[f]||(()=>baseTone(f)))();};
+// 結案鐘聲
+const st=document.getElementById('status');
+if(st)new MutationObserver(()=>{if(audioOn&&/結案|指認成功/.test(st.textContent))setTimeout(sfx.chime,500);}).observe(st,{childList:true,characterData:true,subtree:true});
+
+/* 環境音：雨聲＋壁爐＋鐘擺 */
+let amb=null;
+function ambStart(){const c=AC();if(!c||amb)return;const master=c.createGain();master.gain.value=0;master.connect(c.destination);master.gain.linearRampToValueAtTime(1,c.currentTime+1.5);
+ const rain=c.createBufferSource();rain.buffer=noiseBuf(c,4);rain.loop=true;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1400;const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=350;const rg=c.createGain();rg.gain.value=.05;rain.connect(hp).connect(lp).connect(rg).connect(master);rain.start();
+ const pops=setInterval(()=>{if(Math.random()<.55){const t=c.currentTime,s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();s.buffer=noiseBuf(c,.05);f.type='bandpass';f.frequency.value=900+Math.random()*1800;g.gain.setValueAtTime(.05+Math.random()*.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);s.connect(f).connect(g).connect(master);s.start(t);}},170);
+ let tick=0;const clock=setInterval(()=>{const t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=tick++%2?1800:1500;g.gain.setValueAtTime(.012,t);g.gain.exponentialRampToValueAtTime(.0001,t+.03);const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=2000;o.connect(f).connect(g).connect(master);o.start(t);o.stop(t+.04);},1000);
+ amb={master,rain,pops,clock};}
+function ambStop(){if(!amb)return;const c=AC(),a=amb;amb=null;a.master.gain.linearRampToValueAtTime(0,c.currentTime+.8);clearInterval(a.pops);clearInterval(a.clock);setTimeout(()=>{try{a.rain.stop();a.master.disconnect();}catch{}},900);}
+const ab=document.createElement('button');ab.type='button';ab.className='amb-toggle';ab.setAttribute('aria-pressed','false');
+const drawAb=()=>{ab.innerHTML=`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 15a4 4 0 1 1 1.2-7.8A5.5 5.5 0 0 1 18.5 9 3.5 3.5 0 0 1 18 16H8"/>${amb?'<path d="M9 19l-1 2M13 19l-1 2M17 19l-1 2"/>':'<path d="M4 4l16 16"/>'}</svg><span>${amb?'雨夜環境音：開':'雨夜環境音'}</span>`;ab.setAttribute('aria-pressed',String(!!amb));};
+ab.onclick=()=>{amb?ambStop():ambStart();drawAb();};drawAb();document.body.append(ab);
+
+/* ================= 2. 詢問演出 ================= */
+const tr=document.getElementById('interviewTranscript');
+let typing=null;
+function typeInto(el,text,{liar=false}={}){return new Promise(res=>{let out=text,pauseAt=-1;
+  if(liar){const m=text.search(/[，：。]/);if(m>1&&m<text.length-3){out=text.slice(0,m+1)+'……'+text.slice(m+1);pauseAt=m+1;}}
+  el.textContent='';el.classList.add('typing');let k=0;const step=()=>{if(!el.isConnected)return res();k++;el.textContent=out.slice(0,k);if(k%2&&audioOn)sfx.type();
+   if(k>=out.length){el.classList.remove('typing');typing=null;return res();}
+   typing={finish(){clearTimeout(typing.t);el.textContent=out;el.classList.remove('typing');typing=null;res();},t:setTimeout(step,k===pauseAt+2&&pauseAt>=0?650:(/[，。：]/.test(out[k-1])?180:42))};};step();});}
+if(tr){
+ new MutationObserver(()=>{const bq=tr.querySelector('blockquote:not([data-typed])');if(!bq||!bq.textContent.trim())return;bq.dataset.typed='1';
+  const name=(tr.querySelector('.interview-speaker strong')?.textContent||'').replace('的證詞','');const idx=names.indexOf(name);
+  let liar=false;try{liar=idx===unreliableWitness(level);}catch{}
+  tr.classList.add('talking');tr.classList.toggle('nervous',liar);
+  typeInto(bq,bq.textContent,{liar}).then(()=>tr.classList.remove('talking'));
+  const ans=tr.querySelector('.followup-answer:not([data-typed])');if(ans)ans.dataset.typed='1';
+ }).observe(tr,{childList:true,subtree:true});
+ new MutationObserver(()=>{const ans=tr.querySelector('.followup-answer:not([data-typed])');if(ans&&ans.textContent.trim()){ans.dataset.typed='1';typeInto(ans,ans.textContent);}}).observe(tr,{childList:true,subtree:true,characterData:true});
+ tr.addEventListener('click',e=>{if(typing&&!e.target.closest('button'))typing.finish();});
+}
+
+/* ================= 6. 主線：懷錶零件與日記 ================= */
+const FR=[
+ ['錶殼','十月三日','老鐘錶匠說，這只銀懷錶的錶殼是我父親親手刻的。殼內刻著一行小字：「時間不會說謊。」我一直不懂它的意思。'],
+ ['錶蓋','十月五日','有人在夜裡進過書房。抽屜裡的東西沒少，只是被翻過。我開始把重要的東西，一件一件拆開藏起來。'],
+ ['錶面','十月七日','我把錶面換成了沒有數字的那一片。看得懂它的人，自然知道要看哪裡。'],
+ ['時針','十月九日','六位客人，六個房間。每個人都說自己那晚待在別處。我決定記下每一句話——包括謊話。'],
+ ['分針','十月十日','分針停在四十三分。這不是巧合，是我刻意讓它停下的。'],
+ ['發條','十月十一日','發條是懷錶的心。我把它交給一位我信任的人保管，但我沒有告訴他，它真正的用途。'],
+ ['齒輪','十月十二日','今晚宴會前，我把最後一枚齒輪藏在畫廊的畫框後面。如果我出了什麼事，請找到它。'],
+ ['擒縱輪','十月十三日','有人在試探我。他們以為我只是個健忘的老人。很好，就讓他們這樣以為吧。'],
+ ['錶冠','十月十五日','錶冠轉三圈半，才會打開背蓋。這是我和父親之間的暗號。'],
+ ['錶鍊','十月十六日','如果你收集到這裡，代表你已經看穿了九個謊言。最後一片，就在你一直以為最不可能的地方。']];
+const FINAL_TRUTH='十片零件拼回原樣，懷錶的指針停在 22:43。轉動錶冠三圈半，背蓋彈開——裡面是一張摺得極小的紙條：<br><br>「書房，第三排書架，左數第二十二本，第四十三頁。」<br><br>那一頁夾著老莊主真正的遺囑，以及一句話：<br><em>「真相從不藏在誰在哪裡，而在於你是否願意看清每一句話。」</em><br><br>十宗案件，終於結案。';
+function solved(){return (save.completed||[]).length;}
+function storyPanel(){const host=document.getElementById('workpage-dossier');if(!host)return;let p=host.querySelector('.story-panel');
+ if(!p){p=document.createElement('section');p.className='panel story-panel';const after=host.querySelector('.archive-panel');(after||host.firstChild)?.after?after.after(p):host.append(p);}
+ const done=new Set(save.completed||[]);const n=done.size;
+ p.innerHTML=`<h2>懷錶的秘密</h2><p class="sp-intro">每破一案，就能找回一片銀懷錶的零件，以及老莊主的一頁日記。集滿十片，真相就會浮現。<b>已找回 ${n}／10</b></p>
+ <div class="sp-watch"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="54" r="38" fill="none" stroke="#c9a35b" stroke-width="4"/><circle cx="50" cy="54" r="31" fill="#f6ecd4" stroke="#8a6a48" stroke-width="1.5"/><rect x="45" y="5" width="10" height="9" rx="2" fill="#c9a35b"/>${[...Array(10)].map((_,k)=>{const a=(k/10)*Math.PI*2-Math.PI/2,x=50+24*Math.cos(a),y=54+24*Math.sin(a);return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${done.has(k)?'#c9a35b':'#e2d3b3'}" stroke="#8a6a48" stroke-width="1"/>`}).join('')}<line x1="50" y1="54" x2="50" y2="${n===10?36:44}" stroke="#3d2817" stroke-width="2.5" stroke-linecap="round"/><line x1="50" y1="54" x2="${n===10?62:56}" y2="${n===10?62:58}" stroke="#3d2817" stroke-width="2" stroke-linecap="round"/><circle cx="50" cy="54" r="2.5" fill="#3d2817"/></svg></div>
+ <div class="sp-grid">${FR.map((f,k)=>`<button type="button" class="sp-slot${done.has(k)?' got':''}" data-k="${k}" ${done.has(k)?'':'disabled'}><b>${String(k+1).padStart(2,'0')}</b><span>${done.has(k)?f[0]:'？？？'}</span></button>`).join('')}</div>
+ ${n===10?`<button type="button" class="btn sp-final">拼回懷錶，揭開真相 →</button>`:''}`;
+ p.querySelectorAll('.sp-slot.got').forEach(b=>b.onclick=()=>diary(+b.dataset.k));
+ p.querySelector('.sp-final')?.addEventListener('click',()=>showPage('真相','十月十六日之後',FINAL_TRUTH,true));}
+function showPage(title,date,text,final){const w=document.createElement('div');w.className='diary-wrap';w.innerHTML=`<div class="diary-page${final?' final':''}"><div class="dp-date">${date}</div><h3>${title}</h3><p>${text}</p><button type="button" class="btn">闔上日記</button></div>`;w.onclick=e=>{if(e.target===w||e.target.closest('button'))w.remove();};document.body.append(w);if(audioOn)sfx.paper();}
+function diary(k){const f=FR[k];showPage(`日記第 ${k+1} 頁 · ${f[0]}`,f[1],f[2]);}
+const rr=render;render=function(){rr();storyPanel();};storyPanel();
+// 破案時在結果視窗加上獲得的零件
+const ov=document.getElementById('overlay');
+if(ov)new MutationObserver(()=>{if(ov.classList.contains('hidden'))return;const box=ov.querySelector('.modal');if(!box||box.querySelector('.reward')||!(save.completed||[]).includes(level))return;
+ const f=FR[level];const r=document.createElement('div');r.className='reward';
+ r.innerHTML=`<div class="rw-k">獲得證物</div><div class="rw-name">懷錶零件 №${String(level+1).padStart(2,'0')} · ${f[0]}</div><button type="button" class="rw-btn">讀日記第 ${level+1} 頁</button>${solved()===10?'<button type="button" class="rw-btn final">十片集齊：揭開真相</button>':''}`;
+ r.querySelector('.rw-btn').onclick=()=>diary(level);r.querySelector('.rw-btn.final')?.addEventListener('click',()=>showPage('真相','十月十六日之後',FINAL_TRUTH,true));
+ const t=document.getElementById('ending')||box.lastChild;t.after?t.after(r):box.append(r);}).observe(ov,{attributes:true,attributeFilter:['class','style']});
+if(ov)new MutationObserver(()=>{if(ov.classList.contains('hidden'))ov.querySelector('.reward')?.remove();}).observe(ov,{attributes:true,attributeFilter:['class']});
+
+/* ================= 4. 線索板 ================= */
+const notes=document.getElementById('workpage-notes');
+if(notes){
+ const sec=document.createElement('section');sec.className='panel board-panel';
+ sec.innerHTML=`<h2>線索板</h2><p class="bd-help">拖曳人物和線索卡自由排列。開啟「紅線」後，依序點兩個人物就能連起來（再連一次會取消）。</p>
+ <div class="bd-tools"><select class="bd-pick" aria-label="選擇要釘上的線索"><option value="">📌 釘上一條線索…</option></select><button type="button" class="bd-line" aria-pressed="false">紅線</button><button type="button" class="bd-clear">清空</button></div>
+ <div class="bd-board"><svg class="bd-svg"></svg></div>`;
+ const memoPanel=notes.querySelector('.panel:has(#memo)')||notes.querySelector('.panel');(memoPanel||notes.firstChild).after(sec);
+ const board=sec.querySelector('.bd-board'),svg=sec.querySelector('.bd-svg'),pick=sec.querySelector('.bd-pick'),lineBtn=sec.querySelector('.bd-line');
+ const K=()=>'btc-board-'+level;
+ const def=()=>({pos:Object.fromEntries([...Array(6)].map((_,i)=>['p'+i,[8+(i%3)*32,8+Math.floor(i/3)*44]])),notes:[],links:[]});
+ let B=def(),lineMode=false,first=null;
+ const load=()=>{try{B=Object.assign(def(),JSON.parse(localStorage.getItem(K())||'{}'));}catch{B=def();}};
+ const keep=()=>{try{localStorage.setItem(K(),JSON.stringify(B))}catch{}};
+ const clues=()=>[...document.querySelectorAll('#clues li')].map(li=>li.textContent.trim());
+ function draw(){board.querySelectorAll('.bd-item').forEach(e=>e.remove());
+  for(let i=0;i<6;i++){const [x,y]=B.pos['p'+i];const d=document.createElement('div');d.className='bd-item bd-person'+(first===i?' sel':'');d.dataset.id='p'+i;d.style.left=x+'%';d.style.top=y+'%';d.innerHTML=portrait(i,true)+`<span>${names[i]}</span>`;board.append(d);}
+  const cl=clues();B.notes.forEach((n,k)=>{const d=document.createElement('div');d.className='bd-item bd-note';d.dataset.id='n'+k;d.style.left=n.x+'%';d.style.top=n.y+'%';d.innerHTML=`<b>${n.i+1}</b>${cl[n.i]||''}<button type="button" class="bd-x" aria-label="取下">×</button>`;board.append(d);});
+  lines();
+  pick.innerHTML='<option value="">📌 釘上一條線索…</option>'+cl.map((c,k)=>`<option value="${k}">${k+1}. ${c.slice(0,22)}${c.length>22?'…':''}</option>`).join('');}
+ function center(id){const e=board.querySelector(`[data-id="${id}"]`);if(!e)return null;const b=board.getBoundingClientRect(),r=e.getBoundingClientRect();return [r.left-b.left+r.width/2,r.top-b.top+Math.min(r.height/2,28)];}
+ function lines(){const b=board.getBoundingClientRect();svg.setAttribute('viewBox',`0 0 ${b.width} ${b.height}`);svg.innerHTML=B.links.map(([a,c])=>{const p=center('p'+a),q=center('p'+c);if(!p||!q)return '';const mx=(p[0]+q[0])/2,my=Math.max(p[1],q[1])+30;return `<path d="M${p[0]},${p[1]} Q${mx},${my} ${q[0]},${q[1]}" fill="none" stroke="#b3241b" stroke-width="2.5" stroke-linecap="round"/><circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#b3241b"/><circle cx="${q[0]}" cy="${q[1]}" r="4" fill="#b3241b"/>`}).join('');}
+ // 拖曳
+ let drag=null;
+ board.addEventListener('pointerdown',e=>{const it=e.target.closest('.bd-item');if(!it||e.target.closest('.bd-x'))return;
+  const id=it.dataset.id;const b=board.getBoundingClientRect(),r=it.getBoundingClientRect();drag={it,id,dx:e.clientX-r.left,dy:e.clientY-r.top,b,moved:false,sx:e.clientX,sy:e.clientY};it.setPointerCapture(e.pointerId);it.classList.add('drag');});
+ board.addEventListener('pointermove',e=>{if(!drag)return;if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>5)drag.moved=true;if(!drag.moved)return;e.preventDefault();
+  const {b,it}=drag;let x=(e.clientX-b.left-drag.dx)/b.width*100,y=(e.clientY-b.top-drag.dy)/b.height*100;x=Math.max(0,Math.min(100-it.offsetWidth/b.width*100,x));y=Math.max(0,Math.min(100-it.offsetHeight/b.height*100,y));it.style.left=x+'%';it.style.top=y+'%';
+  if(drag.id[0]==='p')B.pos[drag.id]=[x,y];else{const n=B.notes[+drag.id.slice(1)];n.x=x;n.y=y;}lines();});
+ board.addEventListener('pointerup',()=>{if(!drag)return;const {it,id,moved}=drag;it.classList.remove('drag');drag=null;keep();
+  if(!moved&&lineMode&&id[0]==='p'){const i=+id.slice(1);if(first===null){first=i;}else if(first===i){first=null;}else{const a=Math.min(first,i),c=Math.max(first,i);const k=B.links.findIndex(l=>l[0]===a&&l[1]===c);k>=0?B.links.splice(k,1):B.links.push([a,c]);first=null;keep();if(audioOn)sfx.soft();}draw();}});
+ board.addEventListener('click',e=>{const x=e.target.closest('.bd-x');if(!x)return;const k=+x.parentElement.dataset.id.slice(1);B.notes.splice(k,1);keep();draw();});
+ pick.onchange=()=>{if(pick.value==='')return;const i=+pick.value;B.notes.push({i,x:6+Math.random()*50,y:60+Math.random()*25});keep();draw();if(audioOn)sfx.place();pick.value='';};
+ lineBtn.onclick=()=>{lineMode=!lineMode;first=null;lineBtn.setAttribute('aria-pressed',String(lineMode));board.classList.toggle('line-mode',lineMode);draw();};
+ sec.querySelector('.bd-clear').onclick=async()=>{if(await askConfirm('清空這一案的線索板（人物位置、釘上的線索和紅線）？')){B=def();keep();draw();}};
+ let lastLevel=null;const r2=render;render=function(){r2();if(lastLevel!==level){lastLevel=level;load();first=null;}draw();};
+ load();lastLevel=level;
+ document.getElementById('worktab-notes')?.addEventListener('click',()=>requestAnimationFrame(draw));
+ addEventListener('resize',lines);
+ draw();
+}
+})();
+</script>
+<style>
+/* 手寫字型 */
+#memo.memo,.bd-note,.diary-page p,.diary-page h3{font-family:"LXGW WenKai TC","Kaiti TC","STKaiti","BiauKai",serif!important}
+#memo.memo{font-size:18px!important}
+/* 環境音按鈕 */
+.amb-toggle{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:7000;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;border:1px solid #1a110b;background:#2a1c13e6;color:#f3e3c3;font:600 13px/1 sans-serif;box-shadow:0 4px 12px #0006;cursor:pointer}
+.amb-toggle[aria-pressed=true]{background:#4f7a5ae6;border-color:#23402c}
+/* 詢問演出 */
+.interview-transcript.talking .interview-speaker .mini-portrait{transform:scale(1.25) rotate(-3deg)!important;transition:transform .25s}
+.interview-transcript.nervous.talking .interview-speaker .mini-portrait{animation:nerv .25s 3 .9s}
+@keyframes nerv{25%{transform:scale(1.25) rotate(-5deg) translateX(-2px)}75%{transform:scale(1.25) rotate(-1deg) translateX(2px)}}
+.interview-transcript blockquote.typing:after,.followup-answer.typing:after{content:'▍';color:#a4423b;animation:blink .7s steps(1) infinite}
+/* 主線 */
+.story-panel{background:linear-gradient(#2f2117,#1f160f)!important;color:#ead9bb!important;border:1px solid #120b06!important;box-shadow:inset 0 0 40px #000a,0 8px 18px #0005!important}
+.story-panel h2{color:#f3e3c3!important}
+.story-panel .sp-intro{color:#cbb894}.story-panel .sp-intro b{display:block;margin-top:4px;color:#e9c46a}
+.sp-watch{width:130px;margin:6px auto 10px;filter:drop-shadow(0 6px 10px #000a)}
+.sp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sp-slot{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;border-radius:6px;border:1px dashed #6b5640;background:#ffffff08;color:#7d6a52;font:600 12px/1.2 "Noto Serif TC",serif}
+.sp-slot b{font:700 13px Georgia,serif}
+.sp-slot.got{border:1px solid #c9a35b;background:linear-gradient(#4a3523,#36261a);color:#f3e3c3;cursor:pointer}
+.sp-slot.got b{color:#e9c46a}
+.sp-final{display:block;width:100%;margin-top:12px;background:linear-gradient(#c9a35b,#9b7a3a)!important;color:#1f160f!important;font-weight:800!important;border:0!important}
+.diary-wrap{position:fixed;inset:0;z-index:9500;background:#120a06cc;display:grid;place-items:center;padding:16px;animation:ciFade .3s}
+.diary-page{width:min(460px,100%);box-sizing:border-box;padding:26px 24px 18px;background:linear-gradient(90deg,#0000 30px,#d97a7055 30px 31.5px,#0000 31.5px),#f8efd9;border-radius:3px;box-shadow:0 20px 50px #000c;color:#3d2817;transform:rotate(-1deg);animation:ciIn .45s cubic-bezier(.2,1.2,.4,1)}
+.diary-page .dp-date{font:italic 13px Georgia,serif;color:#8a6a48;padding-left:18px}
+.diary-page h3{margin:6px 0 10px;padding-left:18px;font-size:20px}
+.diary-page p{padding-left:18px;font-size:18px;line-height:32px;margin:0 0 14px}
+.diary-page.final{background:linear-gradient(#fbf3dd,#efdcb2);border:2px solid #c9a35b}
+.diary-page .btn{float:right}
+.reward{margin:14px 0;padding:12px;border:1.5px solid #c9a35b;border-radius:8px;background:#fff8e4;text-align:center}
+.reward .rw-k{font:700 11px sans-serif;letter-spacing:.2em;color:#9b7a3a}
+.reward .rw-name{font:800 17px "Noto Serif TC",serif;color:#3d2817;margin:4px 0 8px}
+.reward .rw-btn{margin:3px;padding:7px 12px;border-radius:6px;border:1px solid #8a6a48;background:#6b4a2d;color:#fff4df;font-weight:700;cursor:pointer}
+.reward .rw-btn.final{background:#c9a35b;color:#1f160f}
+/* 線索板 */
+.board-panel{background:linear-gradient(#f7ecd6,#ecdab6)!important}
+.bd-help{font-size:13px;color:#7d5a38}
+.bd-tools{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.bd-tools select{flex:1 1 200px;min-width:0;font-size:16px;padding:8px;border-radius:6px;border:1px solid #8a6a48;background:#fffaf0;color:#3d2817}
+.bd-tools button{padding:8px 14px;border-radius:6px;border:1px solid #8a6a48;background:#fbf3e2;color:#4a301e;font-weight:800;cursor:pointer}
+.bd-tools .bd-line[aria-pressed=true]{background:#b3241b;color:#fff;border-color:#7a1812}
+.bd-board{position:relative;width:100%;aspect-ratio:4/3;min-height:340px;border:10px solid #6b4a2d;border-radius:4px;overflow:hidden;touch-action:none;
+ background:radial-gradient(#0000 0,#00000012 1px,#0000 2px) 0 0/7px 7px,radial-gradient(#ffffff18 0,#0000 1.5px) 3px 4px/9px 9px,linear-gradient(#c79a63,#b5864f);box-shadow:inset 0 0 30px #0006}
+.bd-board.line-mode{outline:3px dashed #b3241b;outline-offset:-3px}
+.bd-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.bd-item{position:absolute;z-index:2;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.bd-item.drag{z-index:5;cursor:grabbing;filter:drop-shadow(0 8px 10px #0006)}
+.bd-person{width:min(22%,96px);background:#f1e6cf;padding:4px 4px 0;box-shadow:0 3px 6px #0006}
+.bd-person img{display:block;width:100%!important;height:auto!important;aspect-ratio:233/269;object-fit:cover;border:0!important;border-radius:0!important;box-shadow:none!important;pointer-events:none}
+.bd-person span{display:block;text-align:center;font:700 12px/1.6 "Noto Serif TC",serif;color:#2b1d14}
+.bd-person:before{content:"";position:absolute;left:50%;top:-5px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#e86a5c,#9e2f25);box-shadow:0 2px 2px #0006;z-index:4}
+.bd-person.sel{outline:3px solid #b3241b;outline-offset:2px}
+.bd-note{width:min(40%,200px);box-sizing:border-box;padding:12px 22px 10px 10px;background:#fff59a;color:#3d2817;font-size:15px;line-height:1.5;box-shadow:0 4px 8px #0005;transform:rotate(-2deg)}
+.bd-note:nth-of-type(even){transform:rotate(2deg);background:#fbe3a8}
+.bd-note b{display:inline-block;margin-right:4px;color:#b3241b;font-family:Georgia,serif}
+.bd-x{position:absolute;right:2px;top:0;border:0;background:none;font-size:18px;color:#7d5a38;cursor:pointer;padding:2px 6px}
+.board-panel h2,.story-panel h2{display:flex;align-items:center;gap:8px}
+</style>
+<script>
 // FINAL8：引導式教學
 (function(){
 const KEY='btc-tour-done';
@@ -2003,8 +2661,8 @@ const steps=[
  {el:'#workpage-dossier',tab:'dossier',t:'先讀卷宗',d:'卷宗寫著案件經過、時間軸和要解的問題。先把故事讀過一遍，心裡會比較有底。'},
  {el:'#clues',tab:'scene',t:'看官方線索',d:'這些線索全部可靠，是推理的根據，例如「誰和誰相鄰」「誰不在哪一排」。'},
  {el:'#people',tab:'scene',t:'選一位人物',d:'先點一位人物，被選中的人會亮起來。'},
- {el:'#rooms',tab:'scene',t:'放進房間',d:'再點地圖上的房間就能放入。點已經有人或已排除的房間，會跳出選單，可以移除、換人或標記 ❌ 排除。'},
- {el:'#place',parent:true,tab:'scene',t:'切換工具',d:'放置、排除、擦除和復原都在這裡。確定某人不可能在某間時，用 ❌ 排除幫自己縮小範圍。'},
+ {el:'#rooms',tab:'scene',t:'放進房間',d:'再點地圖上的房間就能放入。點已經有人或已排除的房間，會跳出選單，可以移除或換人。'},
+ {el:'.map-howto',tab:'scene',t:'排除不可能的房間',d:'確定某人不可能在某間時，長按那間空房間，就能標記 ❌ 排除，幫自己縮小範圍。'},
  {el:'#interviewButtons',tab:'witness',t:'詢問嫌疑人',d:'六人之中只有一人說謊。點人物聽他的證詞，找出和線索矛盾的那一位。'},
  {el:'#check',parent:true,tab:'scene',t:'提交推理',d:'六個人都放好後按「提交推理」。卡住的話可以用提示，它只會揭露確定正確的位置。'},
  {t:'準備好了！',d:'之後想再看一次教學，按頁面上的「▶ 引導教學」就可以。祝你破案順利。'}
@@ -2027,7 +2685,8 @@ function go(n){i=Math.max(0,Math.min(steps.length-1,n));const s=steps[i];if(s.ta
  const e=target();if(e){const r=e.getBoundingClientRect();if(r.top<70||r.bottom>innerHeight-220)e.scrollIntoView({block:r.height>innerHeight*.55?'start':'center'});}
  requestAnimationFrame(()=>requestAnimationFrame(place));setTimeout(place,350);}
 function start(){if(!wrap)build();wrap.hidden=false;go(0);}
-function end(){if(wrap)wrap.hidden=true;try{localStorage.setItem(KEY,'1')}catch{};tab('dossier');scrollTo({top:0});}
+let introShown=false;
+function end(){if(wrap)wrap.hidden=true;if(window.caseIntro&&!introShown){introShown=true;window.caseIntro();}try{localStorage.setItem(KEY,'1')}catch{};tab('dossier');scrollTo({top:0});}
 window.startTour=start;
 const btn=document.createElement('button');btn.type='button';btn.className='btn tour-launch';btn.textContent='▶ 引導教學';btn.onclick=start;
 const g=document.querySelector('details.guide');if(g)g.before(btn);else document.querySelector('.top')?.append(btn);
