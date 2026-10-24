@@ -1992,4 +1992,63 @@ tapRoom=function(i){const s=state();closeRoomMenu();
  w.onclick=e=>{const a=e.target.closest('button')?.dataset.act;if(e.target===w||a==='close')return closeRoomMenu();if(a)roomAct(i,a);};
  $('rooms').append(w);};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeRoomMenu();});
-</script></body></html>
+</script><script>
+// FINAL8：引導式教學
+(function(){
+const KEY='btc-tour-done';
+const tab=id=>{const t=document.getElementById('worktab-'+id);if(t&&t.getAttribute('aria-selected')!=='true')t.click();};
+const steps=[
+ {t:'歡迎來到線索之間',d:'每一案都有六位訪客，各自待在宅邸的不同房間。你的任務：根據線索和證詞，還原每個人在哪一間。接下來花一分鐘帶你走一遍。'},
+ {el:'#cases',t:'選擇案件',d:'這裡是十個案件。從第 1 案開始，破案後再往下挑戰。'},
+ {el:'#workpage-dossier',tab:'dossier',t:'先讀卷宗',d:'卷宗寫著案件經過、時間軸和要解的問題。先把故事讀過一遍，心裡會比較有底。'},
+ {el:'#clues',tab:'scene',t:'看官方線索',d:'這些線索全部可靠，是推理的根據，例如「誰和誰相鄰」「誰不在哪一排」。'},
+ {el:'#people',tab:'scene',t:'選一位人物',d:'先點一位人物，被選中的人會亮起來。'},
+ {el:'#rooms',tab:'scene',t:'放進房間',d:'再點地圖上的房間就能放入。點已經有人或已排除的房間，會跳出選單，可以移除、換人或標記 ❌ 排除。'},
+ {el:'#place',parent:true,tab:'scene',t:'切換工具',d:'放置、排除、擦除和復原都在這裡。確定某人不可能在某間時，用 ❌ 排除幫自己縮小範圍。'},
+ {el:'#interviewButtons',tab:'witness',t:'詢問嫌疑人',d:'六人之中只有一人說謊。點人物聽他的證詞，找出和線索矛盾的那一位。'},
+ {el:'#check',parent:true,tab:'scene',t:'提交推理',d:'六個人都放好後按「提交推理」。卡住的話可以用提示，它只會揭露確定正確的位置。'},
+ {t:'準備好了！',d:'之後想再看一次教學，按頁面上的「▶ 引導教學」就可以。祝你破案順利。'}
+];
+let i=0,wrap,hole,card;
+function build(){wrap=document.createElement('div');wrap.className='tour-wrap';wrap.innerHTML='<div class="tour-hole"></div><div class="tour-card" role="dialog" aria-live="polite"><div class="tour-step"></div><h3></h3><p></p><div class="tour-btns"><button type="button" class="tour-skip">略過</button><span></span><button type="button" class="tour-prev">上一步</button><button type="button" class="tour-next">下一步</button></div></div>';
+document.body.append(wrap);hole=wrap.querySelector('.tour-hole');card=wrap.querySelector('.tour-card');
+wrap.querySelector('.tour-skip').onclick=end;wrap.querySelector('.tour-prev').onclick=()=>go(i-1);wrap.querySelector('.tour-next').onclick=()=>i<steps.length-1?go(i+1):end();
+addEventListener('resize',place);addEventListener('scroll',place,{passive:true});}
+function target(){const s=steps[i];if(!s.el)return null;let e=document.querySelector(s.el);if(e&&s.parent)e=e.parentElement;return e&&e.offsetParent!==null?e:null;}
+function place(){if(!wrap)return;const e=target(),pad=8,vw=innerWidth,vh=innerHeight;
+ if(!e){hole.style.cssText=`left:${vw/2}px;top:${vh/2}px;width:0;height:0`;card.style.cssText=`left:50%;top:50%;transform:translate(-50%,-50%)`;return;}
+ const r=e.getBoundingClientRect();const top=Math.max(r.top-pad,4),bot=Math.min(r.bottom+pad,vh-4);
+ hole.style.cssText=`left:${r.left-pad}px;top:${top}px;width:${r.width+pad*2}px;height:${bot-top}px`;
+ const cw=Math.min(340,vw-32),ch=card.offsetHeight||200;let cy=bot+12;if(cy+ch>vh-8)cy=top-ch-12;if(cy<8)cy=Math.max(8,vh-ch-8);
+ const cx=Math.min(Math.max(16,r.left+r.width/2-cw/2),vw-cw-16);card.style.cssText=`left:${cx}px;top:${cy}px;width:${cw}px`;}
+function go(n){i=Math.max(0,Math.min(steps.length-1,n));const s=steps[i];if(s.tab)tab(s.tab);
+ card.querySelector('.tour-step').textContent=`${i+1} / ${steps.length}`;card.querySelector('h3').textContent=s.t;card.querySelector('p').textContent=s.d;
+ card.querySelector('.tour-prev').style.visibility=i?'visible':'hidden';card.querySelector('.tour-next').textContent=i===steps.length-1?'開始調查':'下一步';
+ const e=target();if(e){const r=e.getBoundingClientRect();if(r.top<70||r.bottom>innerHeight-220)e.scrollIntoView({block:r.height>innerHeight*.55?'start':'center'});}
+ requestAnimationFrame(()=>requestAnimationFrame(place));setTimeout(place,350);}
+function start(){if(!wrap)build();wrap.hidden=false;go(0);}
+function end(){if(wrap)wrap.hidden=true;try{localStorage.setItem(KEY,'1')}catch{};tab('dossier');scrollTo({top:0});}
+window.startTour=start;
+const btn=document.createElement('button');btn.type='button';btn.className='btn tour-launch';btn.textContent='▶ 引導教學';btn.onclick=start;
+const g=document.querySelector('details.guide');if(g)g.before(btn);else document.querySelector('.top')?.append(btn);
+document.addEventListener('keydown',e=>{if(!wrap||wrap.hidden)return;if(e.key==='Escape')end();if(e.key==='ArrowRight')wrap.querySelector('.tour-next').click();if(e.key==='ArrowLeft'&&i)go(i-1);});
+let seen=false;try{seen=localStorage.getItem(KEY)==='1'}catch{}
+if(!seen)setTimeout(start,500);
+})();
+</script>
+<style>
+.tour-wrap{position:fixed;inset:0;z-index:9000}
+.tour-wrap[hidden]{display:none}
+.tour-hole{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px #1a0f0ab8;outline:2px solid #e9c46a;transition:all .3s ease;pointer-events:none}
+.tour-card{position:fixed;box-sizing:border-box;background:linear-gradient(#fbf1dd,#ecd9b6);border:2px solid #9b744c;border-radius:12px;padding:16px 18px;box-shadow:0 12px 40px #000b;color:#4a301e;transition:top .3s,left .3s}
+.tour-step{font-size:12px;letter-spacing:.15em;color:#9b744c}
+.tour-card h3{margin:4px 0 6px;font-size:19px}
+.tour-card p{margin:0;font-size:15px;line-height:1.65}
+.tour-btns{display:flex;align-items:center;gap:8px;margin-top:14px}
+.tour-btns span{flex:1}
+.tour-btns button{font:inherit;font-size:15px;font-weight:700;padding:8px 14px;min-height:40px;border-radius:8px;border:1.5px solid #9b744c;background:#fff4df;color:#6b4a2d;cursor:pointer}
+.tour-btns .tour-next{background:#6b4a2d;color:#fff4df}
+.tour-btns .tour-skip{border-color:transparent;background:none;font-weight:400;padding:8px 4px}
+.tour-launch{margin:0 0 10px}
+</style>
+</body></html>
