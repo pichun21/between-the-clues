@@ -1441,7 +1441,8 @@ function persist(){try{localStorage.setItem(storageKey,JSON.stringify(save))}cat
 function rng(seed){return()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}}
 function shuffle(a,r){a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 const neighbors=(a,b)=>Math.abs(Math.floor(a/3)-Math.floor(b/3))+Math.abs(a%3-b%3)===1;
-function makePuzzle(level){let r=rng(91277+level*3271),solution=shuffle([0,1,2,3,4,5],r),candidates=[];
+const SEEDOFF=[2,6,0,2,4,1,0,2,5,5];
+function makePuzzle(level){let r=rng(91277+level*3271+SEEDOFF[level]*7919),solution=shuffle([0,1,2,3,4,5],r),candidates=[];
 for(let p=0;p<6;p++){candidates.push({kind:'not',p,room:(solution[p]+1+Math.floor(r()*5))%6});if(level<7)candidates.push({kind:'row',p,row:Math.floor(solution[p]/3)});if(level<5)candidates.push({kind:'col',p,col:solution[p]%3});}
 for(let p=0;p<6;p++)for(let q=p+1;q<6;q++){let a=solution[p],b=solution[q];if(Math.floor(a/3)===Math.floor(b/3))candidates.push({kind:'sameRow',p,q});else candidates.push({kind:'diffRow',p,q});if(a%3===b%3)candidates.push({kind:'sameCol',p,q});else candidates.push({kind:'diffCol',p,q});if(neighbors(a,b))candidates.push({kind:'adj',p,q});else candidates.push({kind:'notAdj',p,q});if(a<b)candidates.push({kind:'before',p,q});else candidates.push({kind:'before',p:q,q:p});}
 for(let p=0;p<6;p++)candidates.push({kind:'exact',p,room:solution[p]});
@@ -1708,7 +1709,7 @@ const witnessVoices=[
  ['別小看這些細節，','我清楚記得那條路。'],
  ['根據我的紀錄，','我不會隨便下結論。']
 ];
-function unreliableWitness(n){return (n*7+2)%6}
+function unreliableWitness(n){return [4,3,2,0,4,1,2,0,3,5][n]}
 function interviewStatement(n,i){
  const trueRoom=puzzles[n].solution[i];
  if(i===unreliableWitness(n))return `${witnessVoices[i][0]}那晚我絕對沒有進過${roomNames[trueRoom]}。${witnessVoices[i][1]}`;
@@ -2964,6 +2965,7 @@ T.forEach((t,i)=>titles[i]=t);S.forEach((t,i)=>stories[i]=t);M.forEach((t,i)=>mo
 
 })();
 </script>
+<script>(function(){const M=["懷錶在舊壁爐旁找到。丹尼爾承認，是老莊主請他把錶停在 22:43——這是老莊主留下的第一個謎。", "調包帳本的是艾琳。她想確認叔叔是否把家產轉給了外人，卻不知道那本正是老莊主故意留下的假帳。", "維克多換走了畫，但他拿走的只是贗品。真畫一直鎖在老莊主的密櫃裡，他正好落入圈套。", "腳印屬於園丁湯瑪斯。那扇藏在樹籬後的小門，照理說只有在莊園待了幾十年的人才知道——可是他才剛來不久。", "拆信的是夏洛特。記者的好奇心讓她讀到了老莊主的家族往事：他從來不信任為了遺產而來的人。", "翻書找地契的又是艾琳。但真正的地契從未夾在書裡，書頁間只留下一枚黑荊棘印記。", "丹尼爾調慢了門廳老鐘三分鐘。他坦承是受老莊主所託——「為了看誰在說謊」。", "維克多把黑寶石藏進雕像底座，打算散場後帶走。雕像下方，刻著和懷錶背蓋一樣的花紋。", "打開儲藏室的是管家班傑明。他手上的備用鑰匙，是老莊主親手交出的——他是唯一知道整個計畫的人。", "黑荊棘印記的主人，就是園丁湯瑪斯。十宗事件，都是他事先布好的局。"];M.forEach((t,i)=>motives[i]=t);})();</script>
 <script>
 // FINAL8：引導式教學
 (function(){
